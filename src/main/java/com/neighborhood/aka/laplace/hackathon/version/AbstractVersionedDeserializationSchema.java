@@ -12,20 +12,17 @@ import java.io.IOException;
 import java.util.Collection;
 import java.util.Iterator;
 
-public abstract class AbstractVersionedDeserializationSchema<V extends Versioned<V>> implements VersionedDeserializationSchema<V> {
+public abstract class AbstractVersionedDeserializationSchema implements VersionedDeserializationSchema {
 
     private final RowType rowType;
-    private final TypeSerializer<V> versionTypeSerializer;
-    private final Class<V> versionClass;
+    private final TypeSerializer<Versioned> versionTypeSerializer;
 
     public AbstractVersionedDeserializationSchema(
             RowType rowType,
-            TypeSerializer<V> versionTypeSerializer,
-            Class<V> versionClass
+            TypeSerializer<Versioned> versionTypeSerializer
     ) {
         this.rowType = rowType;
         this.versionTypeSerializer = versionTypeSerializer;
-        this.versionClass = versionClass;
     }
 
 
@@ -35,23 +32,19 @@ public abstract class AbstractVersionedDeserializationSchema<V extends Versioned
     }
 
     @Override
-    public TypeSerializer<V> getVersionTypeSerializer() {
+    public TypeSerializer<Versioned> getVersionTypeSerializer() {
         return this.versionTypeSerializer;
     }
 
-    @Override
-    public Class<V> getVersionClass() {
-        return this.versionClass;
-    }
 
     @Override
     public void deserialize(byte[] message, Collector<RowData> out) throws IOException {
-        Iterator<Tuple2<RowData, V>> iterator = deserializeInternal(message).iterator();
+        Iterator<Tuple2<RowData, Versioned>> iterator = deserializeInternal(message).iterator();
         while (iterator.hasNext()) {
-            Tuple2<RowData, V> curr = iterator.next();
+            Tuple2<RowData, Versioned> curr = iterator.next();
             out.collect(new JoinedRowData(curr.f0, GenericRowData.of(curr.f1)));
         }
     }
 
-    protected abstract Collection<Tuple2<RowData, V>> deserializeInternal(byte[] bytes);
+    protected abstract Collection<Tuple2<RowData, Versioned>> deserializeInternal(byte[] bytes);
 }

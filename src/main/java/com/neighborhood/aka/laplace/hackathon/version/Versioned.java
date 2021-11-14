@@ -2,28 +2,35 @@ package com.neighborhood.aka.laplace.hackathon.version;
 
 import java.io.Serializable;
 
-public interface Versioned<T extends Versioned<T>> extends Comparable<T>, Serializable {
+public final class Versioned implements Comparable<Versioned>, Serializable {
 
-    boolean isZeroVersion();
+    private long generatedTs;
 
-    long getGeneratedTs();
+    private long unifiedVersion;
 
-    @Override
-    default int compareTo(T o) {
-        if (this.isZeroVersion()) {
-            if (o.isZeroVersion()) {
-                return 0;
-            } else {
-                return -1;
-            }
-        } else {
-            if (o.isZeroVersion()) {
-                return 1;
-            } else {
-                return compareToNonZeroVersionObject(o);
-            }
-        }
+    public Versioned() {
     }
 
-    int compareToNonZeroVersionObject(T o);
+    public long getGeneratedTs() {
+        return generatedTs;
+    }
+
+    public Versioned setGeneratedTs(long generatedTs) {
+        this.generatedTs = generatedTs;
+        return this;
+    }
+
+    public long getUnifiedVersion() {
+        return unifiedVersion;
+    }
+
+    public Versioned setUnifiedVersion(long unifiedVersion) {
+        this.unifiedVersion = unifiedVersion;
+        return this;
+    }
+
+    @Override
+    public int compareTo(Versioned o) {
+        return Long.compare(this.unifiedVersion, o.unifiedVersion);
+    }
 }
