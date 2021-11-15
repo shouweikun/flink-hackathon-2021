@@ -1,23 +1,22 @@
 package com.neighborhood.aka.lapalce.hackathon.source
 
-import com.neighborhood.aka.lapalce.hackathon.integrate.DataIntegrateKeyedCoProcessFunction
+import com.neighborhood.aka.lapalce.hackathon.integrate.{DataIntegrateKeyedCoProcessFunction, SpecializedKeyedCoProcessOperator}
+import com.neighborhood.aka.lapalce.hackathon.source.SourceUtils.createSource
 import com.neighborhood.aka.laplace.hackathon.version.{Versioned, VersionedDeserializationSchema}
-import org.apache.flink.api.common.eventtime.WatermarkStrategy
+import org.apache.flink.api.common.eventtime._
+import org.apache.flink.api.common.typeinfo.TypeInformation
 import org.apache.flink.api.common.typeutils.TypeSerializer
 import org.apache.flink.streaming.api.datastream.DataStream
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment
 import org.apache.flink.table.api.TableSchema
 import org.apache.flink.table.connector.ChangelogMode
 import org.apache.flink.table.connector.format.DecodingFormat
-import org.apache.flink.table.connector.source.ScanTableSource.ScanRuntimeProvider
 import org.apache.flink.table.connector.source._
 import org.apache.flink.table.data.RowData
 import org.apache.flink.table.planner.plan.utils.KeySelectorUtil
 import org.apache.flink.table.runtime.typeutils.InternalTypeInfo
-import org.apache.flink.table.utils.TableSchemaUtils
-import SourceUtils.createSource
-import org.apache.flink.api.common.typeinfo.TypeInformation
 import org.apache.flink.table.types.logical.RowType
+import org.apache.flink.table.utils.TableSchemaUtils
 
 class UnifiedTableSource(
                           private val bulkSource: ScanTableSource,
@@ -48,10 +47,52 @@ class UnifiedTableSource(
       val bulkKeySelector = KeySelectorUtil.getRowDataSelector(primaryKeys, bulkSource.getTransformation.getOutputType.asInstanceOf[InternalTypeInfo[RowData]])
       val realtimeKeySelector = KeySelectorUtil.getRowDataSelector(primaryKeys, realtimeChangelogSource.getTransformation.getOutputType.asInstanceOf[InternalTypeInfo[RowData]])
 
+      val watermarkGenerator = new WatermarkGenerator[RowData] {
+
+        private var currTs: Long = Long.MinValue
+
+        override def onEvent(t: RowData, l: Long, watermarkOutput: WatermarkOutput): Unit = {
+          val ts = t.getRawValue(t.getArity - 1).toObject(versionTypeSer).getGeneratedTs
+          if (currTs < ts) {
+            currTs = ts
+            watermarkOutput.emitWatermark(new Watermark(ts))
+          }
+
+        }
+
+        override def onPeriodicEmit(watermarkOutput: WatermarkOutput): Unit = {
+          watermarkOutput.emitWatermark(new Watermark(currTs))
+        }
+      }
+
+      val watermarkGeneratorSupplier = new WatermarkGeneratorSupplier[RowData] {
+        override def createWatermarkGenerator(context: WatermarkGeneratorSupplier.Context): WatermarkGenerator[RowData] = {
+          watermarkGenerator
+        }
+      }
+
       bulkSource
-        .connect(realtimeChangelogSource)
+        .connect(
+          realtimeChangelogSource
+            .assignTimestampsAndWatermarks(
+              WatermarkStrategy.forGenerator(watermarkGeneratorSupplier)
+            )
+        )
         .keyBy(bulkKeySelector, realtimeKeySelector)
-        .process(new DataIntegrateKeyedCoProcessFunction(fixedDelay, versionTypeSer, changelogInputRowType, outputRowType, outputTypeInformation, TypeInformation.of(classOf[Versioned])))
+        .transform(
+          "dataIntegrate",
+          outputTypeInformation,
+          new SpecializedKeyedCoProcessOperator(
+            new DataIntegrateKeyedCoProcessFunction(
+              fixedDelay,
+              versionTypeSer,
+              changelogInputRowType,
+              outputRowType,
+              outputTypeInformation,
+              TypeInformation.of(classOf[Versioned])
+            )
+          )
+        )
     }
 
     override def isBounded: Boolean = false

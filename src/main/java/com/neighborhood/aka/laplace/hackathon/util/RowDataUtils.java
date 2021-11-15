@@ -1,4 +1,4 @@
-package com.neighborhood.aka.laplace.hackathon.version;
+package com.neighborhood.aka.laplace.hackathon.util;
 
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.data.utils.JoinedRowData;

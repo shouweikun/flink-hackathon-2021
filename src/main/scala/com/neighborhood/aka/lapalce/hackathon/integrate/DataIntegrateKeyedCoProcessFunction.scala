@@ -1,6 +1,7 @@
 package com.neighborhood.aka.lapalce.hackathon.integrate
 
-import com.neighborhood.aka.laplace.hackathon.version.{RowDataUtils, Versioned}
+import com.neighborhood.aka.laplace.hackathon.util.RowDataUtils
+import com.neighborhood.aka.laplace.hackathon.version.Versioned
 import org.apache.flink.api.common.state.{ValueState, ValueStateDescriptor}
 import org.apache.flink.api.common.typeinfo.{TypeInformation, Types}
 import org.apache.flink.api.common.typeutils.TypeSerializer
