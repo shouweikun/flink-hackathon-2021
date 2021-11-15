@@ -21,5 +21,11 @@
  - 设计一套DynamicTableSource及相关组件，尽可能复用已有Flink SQL Connector
  - （Optional） 探索多表读取时一致性相关机制
 
+## 成员介绍
+
+[刘首维](https://github.com/shouweikun) （天池ID：首维君1）code for fun~
+[张茄子]() (天池ID：xxx) 你的介绍
+
+
 
 
