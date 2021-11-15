@@ -12,7 +12,11 @@
 
 ## 目标
 
-完成数据整合算法的设计与实现，并设计一套可以最大复用已有Flink SQL Connector的机制，组合任何Source完成整合。（Optional）最后希望可以进行一致性相关的探索 
+ - 完成数据整合算法的设计与实现
+
+ - 设计一套可以最大复用已有Flink SQL Connector的机制，组合任何Source完成整合
+
+ - （Optional）最后希望可以进行一致性相关的探索 
 
 ## 实施方案
 
@@ -22,8 +26,9 @@
  - （Optional） 探索多表读取时一致性相关机制
 
 ## 成员介绍
-
+<br>
 [刘首维](https://github.com/shouweikun) （天池ID：首维君1）code for fun~
+<br>
 [张茄子]() (天池ID：xxx) 你的介绍
 
 
