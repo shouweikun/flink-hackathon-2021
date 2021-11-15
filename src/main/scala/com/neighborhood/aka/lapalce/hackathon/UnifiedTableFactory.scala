@@ -5,14 +5,14 @@ import com.neighborhood.aka.lapalce.hackathon.source.UnifiedTableSource
 import com.neighborhood.aka.laplace.hackathon.version.VersionedDeserializationSchema
 import org.apache.flink.api.common.serialization.DeserializationSchema
 import org.apache.flink.configuration.{ConfigOption, ConfigOptions, ReadableConfig}
-import org.apache.flink.table.catalog.{CatalogTable, CatalogTableImpl, ObjectIdentifier}
+import org.apache.flink.table.catalog.{CatalogTable, ObjectIdentifier}
 import org.apache.flink.table.connector.format.DecodingFormat
 import org.apache.flink.table.connector.source.{DynamicTableSource, ScanTableSource}
 import org.apache.flink.table.data.RowData
 import org.apache.flink.table.factories.{DeserializationFormatFactory, DynamicTableFactory, DynamicTableSourceFactory, FactoryUtil}
 
-import java.util
 import java.lang.{Long => JLong}
+import java.util
 import scala.collection.JavaConversions._
 
 class UnifiedTableFactory extends DynamicTableSourceFactory {

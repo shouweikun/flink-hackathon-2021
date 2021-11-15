@@ -17,6 +17,7 @@ import org.apache.flink.table.planner.plan.utils.KeySelectorUtil
 import org.apache.flink.table.runtime.typeutils.InternalTypeInfo
 import org.apache.flink.table.types.logical.RowType
 import org.apache.flink.table.utils.TableSchemaUtils
+import org.apache.flink.types.RowKind
 
 class UnifiedTableSource(
                           private val bulkSource: ScanTableSource,
@@ -41,8 +42,8 @@ class UnifiedTableSource(
 
     override def produceDataStream(streamExecutionEnvironment: StreamExecutionEnvironment): DataStream[RowData] = {
 
-      val bulkSource = createSource(streamExecutionEnvironment, bulkSourceProvider)
-      val realtimeChangelogSource = createSource(streamExecutionEnvironment, realtimeChangelogSourceProvider)
+      val bulkSource = createSource(streamExecutionEnvironment, bulkSourceProvider, Option(outputTypeInformation))
+      val realtimeChangelogSource = createSource(streamExecutionEnvironment, realtimeChangelogSourceProvider, Option(outputTypeInformation))
       val primaryKeys = TableSchemaUtils.getPrimaryKeyIndices(tableSchema)
       val bulkKeySelector = KeySelectorUtil.getRowDataSelector(primaryKeys, bulkSource.getTransformation.getOutputType.asInstanceOf[InternalTypeInfo[RowData]])
       val realtimeKeySelector = KeySelectorUtil.getRowDataSelector(primaryKeys, realtimeChangelogSource.getTransformation.getOutputType.asInstanceOf[InternalTypeInfo[RowData]])
@@ -99,7 +100,13 @@ class UnifiedTableSource(
   }
 
 
-  override def getChangelogMode: ChangelogMode = ???
+  override def getChangelogMode: ChangelogMode = ChangelogMode
+    .newBuilder()
+    .addContainedKind(RowKind.DELETE)
+    .addContainedKind(RowKind.INSERT)
+    .addContainedKind(RowKind.UPDATE_AFTER)
+    .addContainedKind(RowKind.UPDATE_BEFORE)
+    .build()
 
   override def getScanRuntimeProvider(scanContext: ScanTableSource.ScanContext): ScanTableSource.ScanRuntimeProvider = {
 
@@ -109,6 +116,7 @@ class UnifiedTableSource(
     val versionTypeSer = versionedDeserializationSchema.getVersionTypeSerializer
     val changlogOutputRowType = versionedDeserializationSchema.getActualRowType
     val outputRowType = dataType.getLogicalType.asInstanceOf[RowType]
+
 
     new UnifiedDataStreamScanProvider(
       bulkSource.getScanRuntimeProvider(scanContext),
@@ -122,7 +130,13 @@ class UnifiedTableSource(
 
   }
 
-  override def copy(): DynamicTableSource = ???
+  override def copy(): DynamicTableSource = new UnifiedTableSource(
+    bulkSource,
+    realtimeChangelogSource,
+    tableSchema,
+    decodingFormat,
+    fixedDelay
+  )
 
-  override def asSummaryString(): String = ???
+  override def asSummaryString(): String = "unified source"
 }
