@@ -68,36 +68,39 @@ class UnifiedTableSource(
           .asInstanceOf[InternalTypeInfo[RowData]]
       )
 
-      val watermarkGenerator = new WatermarkGenerator[RowData] {
-
-        private var currTs: Long = Long.MinValue
-
-        override def onEvent(
-            t: RowData,
-            l: Long,
-            watermarkOutput: WatermarkOutput
-        ): Unit = {
-          val ts = t
-            .getRawValue(t.getArity - 1)
-            .toObject(versionTypeSer)
-            .getGeneratedTs
-          if (currTs < ts) {
-            currTs = ts
-            watermarkOutput.emitWatermark(new Watermark(ts))
-          }
-
-        }
-
-        override def onPeriodicEmit(watermarkOutput: WatermarkOutput): Unit = {
-          watermarkOutput.emitWatermark(new Watermark(currTs))
-        }
-      }
-
       val watermarkGeneratorSupplier = new WatermarkGeneratorSupplier[RowData] {
+
+        val vtser = versionTypeSer
+
         override def createWatermarkGenerator(
             context: WatermarkGeneratorSupplier.Context
         ): WatermarkGenerator[RowData] = {
-          watermarkGenerator
+          new WatermarkGenerator[RowData] {
+
+            private var currTs: Long = Long.MinValue
+
+            override def onEvent(
+                t: RowData,
+                l: Long,
+                watermarkOutput: WatermarkOutput
+            ): Unit = {
+              val ts = t
+                .getRawValue(t.getArity - 1)
+                .toObject(vtser)
+                .getGeneratedTs
+              if (currTs < ts) {
+                currTs = ts
+                watermarkOutput.emitWatermark(new Watermark(ts))
+              }
+
+            }
+
+            override def onPeriodicEmit(
+                watermarkOutput: WatermarkOutput
+            ): Unit = {
+              watermarkOutput.emitWatermark(new Watermark(currTs))
+            }
+          }
         }
       }
 

@@ -12,6 +12,7 @@ import org.apache.flink.table.connector.source.DynamicTableSource
 import org.apache.flink.table.data.RowData
 import org.apache.flink.table.factories.{
   DecodingFormatFactory,
+  DeserializationFormatFactory,
   DynamicTableFactory
 }
 import org.apache.flink.table.types.DataType
@@ -20,8 +21,7 @@ import org.apache.flink.types.RowKind
 
 import java.util
 
-class TestChangelogDecodingFormatFactory
-    extends DecodingFormatFactory[DeserializationSchema[RowData]] {
+class TestChangelogDecodingFormatFactory extends DeserializationFormatFactory {
 
   override def createDecodingFormat(
       context: DynamicTableFactory.Context,

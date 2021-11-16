@@ -9,15 +9,14 @@ import org.apache.flink.table.connector.source.DynamicTableSource
 import org.apache.flink.table.data.RowData
 import org.apache.flink.table.factories.{
   DecodingFormatFactory,
+  DeserializationFormatFactory,
+  DeserializationSchemaFactory,
   DynamicTableFactory
 }
 import org.apache.flink.table.types.DataType
 import org.apache.flink.table.types.logical.RowType
 
-import java.util
-
-class TestBulkDecodingFormatFactory
-    extends DecodingFormatFactory[DeserializationSchema[RowData]] {
+class TestBulkDecodingFormatFactory extends DeserializationFormatFactory {
 
   override def createDecodingFormat(
       context: DynamicTableFactory.Context,

@@ -1,11 +1,12 @@
 /* (C)2021 */
 package com.neighborhood.aka.laplace.hackathon
 
-import com.neighborhood.aka.lapalce.hackathon.TestBase
+import com.neighborhood.aka.lapalce.hackathon.{TestBase, UnifiedTableFactory}
 import org.apache.flink.api.common.restartstrategy.RestartStrategies
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment
 import org.apache.flink.table.api.EnvironmentSettings
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment
+import org.apache.flink.table.factories.FactoryUtil
 import org.junit.{Before, Test}
 
 class UnifiedTableITTest extends TestBase {
@@ -25,6 +26,28 @@ class UnifiedTableITTest extends TestBase {
   }
 
   @Test
-  def testUnifiedTableSource(): Unit = {}
+  def testUnifiedTableSource(): Unit = {
+
+    val sourceTableName = "source_table"
+    val createTableSql =
+      s"""
+         create table $sourceTableName(
+          k int,
+          v int,
+          primary key(k) not enforced
+         ) with (
+          'connector' = 'unified',
+          '${UnifiedTableFactory.CHANGELOG_PREFIX}connector' = 'dummy',
+          '${UnifiedTableFactory.BULK_PREFIX}connector' = 'dummy',
+          '${UnifiedTableFactory.CHANGELOG_PREFIX}${FactoryUtil.FORMAT
+        .key()}' = 'TEST-CHANGELOG',
+          '${UnifiedTableFactory.BULK_PREFIX}${FactoryUtil.FORMAT
+        .key()}' = 'TEST-BULK'
+         )
+        """
+    tEnv.executeSql(createTableSql)
+
+    tEnv.executeSql(s"select * from $sourceTableName")
+  }
 
 }
