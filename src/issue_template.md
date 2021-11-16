@@ -4,7 +4,9 @@
 
 随着数据技术的不断演进，"流批一体"这一概念正不断从原型设计向着落地进发。Apache Flink自开始起就将"流批一体"作为顶层成员进行考虑。而Source作为数据的入口，是我们实现流批一致性的第一个重要部件。
 本项目试图提出一种轻量级的Source批流融合算法，并基于Flink进行实现。
-此外，设计一套全新的Connector，可以在尽可能复用已有的Sql Connector组件下，以非常小的实现代价，组合任意两种Source，进行数据融合，生成RowKind语义完备，不重不漏的数据流。最后，我们将尝试进行多Source表数据一致性相关的探索，试图完成一套完整的机制和对应的实现。
+此外，设计一套全新的Connector，可以在**尽可能复用已有的Sql Connector组件下**，以非常小的实现代价，**组合任意两种Source**，进行数据融合，生成RowKind语义完备，不重不漏的数据流。最后，我们将尝试进行多Source表数据一致性相关的探索，试图完成一套完整的机制和对应的实现。
+
+[项目Repo](https://github.com/shouweikun/flink-hackathon-2021)
 
 ## 背景
 
@@ -12,7 +14,7 @@
 
 ## 目标
 
- - 完成数据整合算法的设计与实现
+ - 完成数据整合算法的设计与及基于Flink的通用实现
 
  - 设计一套可以最大复用已有Flink SQL Connector的机制，组合任何Source完成整合
 
@@ -27,9 +29,11 @@
 
 ## 成员介绍
 <br>
+
 [刘首维](https://github.com/shouweikun) （天池ID：首维君1）code for fun~
 <br>
-[张茄子]() (天池ID：xxx) 你的介绍
+
+[张茄子](https://www.zhihu.com/people/chase-zh) (天池ID：chasezh) 
 
 
 
