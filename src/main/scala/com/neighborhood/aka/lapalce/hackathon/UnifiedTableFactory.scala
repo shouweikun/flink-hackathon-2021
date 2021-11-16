@@ -2,7 +2,7 @@ package com.neighborhood.aka.lapalce.hackathon
 
 import com.neighborhood.aka.lapalce.hackathon.UnifiedTableFactory.{FIXED_DELAY, InternalContext, getBulkOptions, getRealtimeChangeOptions}
 import com.neighborhood.aka.lapalce.hackathon.source.UnifiedTableSource
-import com.neighborhood.aka.laplace.hackathon.version.VersionedDeserializationSchema
+import com.neighborhood.aka.laplace.hackathon.VersionedDeserializationSchema
 import org.apache.flink.api.common.serialization.DeserializationSchema
 import org.apache.flink.configuration.{ConfigOption, ConfigOptions, ReadableConfig}
 import org.apache.flink.table.catalog.{CatalogTable, ObjectIdentifier}

@@ -1,5 +1,6 @@
-package com.neighborhood.aka.laplace.hackathon.version;
+package com.neighborhood.aka.laplace.hackathon;
 
+import com.neighborhood.aka.laplace.hackathon.version.Versioned;
 import org.apache.flink.api.common.ExecutionConfig;
 import org.apache.flink.api.common.serialization.DeserializationSchema;
 import org.apache.flink.api.common.typeinfo.TypeInformation;

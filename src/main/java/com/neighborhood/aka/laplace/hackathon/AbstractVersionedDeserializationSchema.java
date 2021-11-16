@@ -1,5 +1,7 @@
-package com.neighborhood.aka.laplace.hackathon.version;
+package com.neighborhood.aka.laplace.hackathon;
 
+import com.neighborhood.aka.laplace.hackathon.VersionedDeserializationSchema;
+import com.neighborhood.aka.laplace.hackathon.version.Versioned;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.table.data.GenericRowData;

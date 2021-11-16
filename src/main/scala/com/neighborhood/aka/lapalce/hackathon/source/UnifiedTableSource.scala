@@ -2,7 +2,8 @@ package com.neighborhood.aka.lapalce.hackathon.source
 
 import com.neighborhood.aka.lapalce.hackathon.integrate.{DataIntegrateKeyedCoProcessFunction, SpecializedKeyedCoProcessOperator}
 import com.neighborhood.aka.lapalce.hackathon.source.SourceUtils.createSource
-import com.neighborhood.aka.laplace.hackathon.version.{Versioned, VersionedDeserializationSchema}
+import com.neighborhood.aka.laplace.hackathon.VersionedDeserializationSchema
+import com.neighborhood.aka.laplace.hackathon.version.Versioned
 import org.apache.flink.api.common.eventtime._
 import org.apache.flink.api.common.typeinfo.TypeInformation
 import org.apache.flink.api.common.typeutils.TypeSerializer
