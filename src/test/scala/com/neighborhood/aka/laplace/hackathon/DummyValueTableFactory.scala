@@ -8,6 +8,7 @@ import org.apache.flink.table.connector.format.DecodingFormat
 import org.apache.flink.table.connector.source.{DynamicTableSource, ScanTableSource, SourceFunctionProvider}
 import org.apache.flink.table.data.RowData
 import org.apache.flink.table.factories.{DeserializationSchemaFactory, DynamicTableFactory, DynamicTableSourceFactory, FactoryUtil}
+import org.apache.flink.types.RowKind
 
 import scala.collection.JavaConversions._
 import java.util
@@ -22,6 +23,10 @@ class DummyValueTableFactory extends DynamicTableSourceFactory {
 
     override def getChangelogMode: ChangelogMode = ChangelogMode
       .newBuilder()
+      .addContainedKind(RowKind.DELETE)
+      .addContainedKind(RowKind.INSERT)
+      .addContainedKind(RowKind.UPDATE_AFTER)
+      .addContainedKind(RowKind.UPDATE_BEFORE)
       .build()
 
     override def getScanRuntimeProvider(scanContext: ScanTableSource.ScanContext): ScanTableSource.ScanRuntimeProvider = {
