@@ -1,3 +1,4 @@
+/* (C)2021 */
 package com.neighborhood.aka.laplace.hackathon
 
 object TestData {
@@ -21,7 +22,6 @@ object TestData {
     ("-u", 3, 2, 1637046364908L),
     ("-u", 3, 4, 1637046364909L),
     ("i", 5, 5, 1637046364910L),
-
     // duplicate
     ("+u", 1, 2, 1637046364904L),
     ("-u", 2, 1, 1637046364905L),
@@ -31,10 +31,7 @@ object TestData {
     ("-u", 3, 4, 1637046364909L),
     ("i", 5, 5, 1637046364910L),
     // duplicate
-
-
     ("d", 1, 2, 2637046364911L)
   )
-
 
 }

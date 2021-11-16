@@ -1,6 +1,10 @@
+/* (C)2021 */
 package com.neighborhood.aka.lapalce.hackathon.source
 
-import com.neighborhood.aka.lapalce.hackathon.integrate.{DataIntegrateKeyedCoProcessFunction, SpecializedKeyedCoProcessOperator}
+import com.neighborhood.aka.lapalce.hackathon.integrate.{
+  DataIntegrateKeyedCoProcessFunction,
+  SpecializedKeyedCoProcessOperator
+}
 import com.neighborhood.aka.lapalce.hackathon.source.SourceUtils.createSource
 import com.neighborhood.aka.laplace.hackathon.VersionedDeserializationSchema
 import com.neighborhood.aka.laplace.hackathon.version.Versioned
@@ -21,40 +25,62 @@ import org.apache.flink.table.utils.TableSchemaUtils
 import org.apache.flink.types.RowKind
 
 class UnifiedTableSource(
-                          private val bulkSource: ScanTableSource,
-                          private val realtimeChangelogSource: ScanTableSource,
-                          private val tableSchema: TableSchema,
-                          private val decodingFormat: DecodingFormat
-
-                            [VersionedDeserializationSchema],
-                          private val fixedDelay: Long
-                        ) extends ScanTableSource {
-
+    private val bulkSource: ScanTableSource,
+    private val realtimeChangelogSource: ScanTableSource,
+    private val tableSchema: TableSchema,
+    private val decodingFormat: DecodingFormat[VersionedDeserializationSchema],
+    private val fixedDelay: Long
+) extends ScanTableSource {
 
   private[source] class UnifiedDataStreamScanProvider(
-                                                       bulkSourceProvider: ScanTableSource.ScanRuntimeProvider,
-                                                       realtimeChangelogSourceProvider: ScanTableSource.ScanRuntimeProvider,
-                                                       fixedDelay: Long,
-                                                       versionTypeSer: TypeSerializer[Versioned],
-                                                       changelogInputRowType: RowType,
-                                                       outputRowType: RowType,
-                                                       outputTypeInformation: TypeInformation[RowData]
-                                                     ) extends DataStreamScanProvider {
+      bulkSourceProvider: ScanTableSource.ScanRuntimeProvider,
+      realtimeChangelogSourceProvider: ScanTableSource.ScanRuntimeProvider,
+      fixedDelay: Long,
+      versionTypeSer: TypeSerializer[Versioned],
+      changelogInputRowType: RowType,
+      outputRowType: RowType,
+      outputTypeInformation: TypeInformation[RowData]
+  ) extends DataStreamScanProvider {
 
-    override def produceDataStream(streamExecutionEnvironment: StreamExecutionEnvironment): DataStream[RowData] = {
+    override def produceDataStream(
+        streamExecutionEnvironment: StreamExecutionEnvironment
+    ): DataStream[RowData] = {
 
-      val bulkSource = createSource(streamExecutionEnvironment, bulkSourceProvider, Option(outputTypeInformation))
-      val realtimeChangelogSource = createSource(streamExecutionEnvironment, realtimeChangelogSourceProvider, Option(outputTypeInformation))
+      val bulkSource = createSource(
+        streamExecutionEnvironment,
+        bulkSourceProvider,
+        Option(outputTypeInformation)
+      )
+      val realtimeChangelogSource = createSource(
+        streamExecutionEnvironment,
+        realtimeChangelogSourceProvider,
+        Option(outputTypeInformation)
+      )
       val primaryKeys = TableSchemaUtils.getPrimaryKeyIndices(tableSchema)
-      val bulkKeySelector = KeySelectorUtil.getRowDataSelector(primaryKeys, bulkSource.getTransformation.getOutputType.asInstanceOf[InternalTypeInfo[RowData]])
-      val realtimeKeySelector = KeySelectorUtil.getRowDataSelector(primaryKeys, realtimeChangelogSource.getTransformation.getOutputType.asInstanceOf[InternalTypeInfo[RowData]])
+      val bulkKeySelector = KeySelectorUtil.getRowDataSelector(
+        primaryKeys,
+        bulkSource.getTransformation.getOutputType
+          .asInstanceOf[InternalTypeInfo[RowData]]
+      )
+      val realtimeKeySelector = KeySelectorUtil.getRowDataSelector(
+        primaryKeys,
+        realtimeChangelogSource.getTransformation.getOutputType
+          .asInstanceOf[InternalTypeInfo[RowData]]
+      )
 
       val watermarkGenerator = new WatermarkGenerator[RowData] {
 
         private var currTs: Long = Long.MinValue
 
-        override def onEvent(t: RowData, l: Long, watermarkOutput: WatermarkOutput): Unit = {
-          val ts = t.getRawValue(t.getArity - 1).toObject(versionTypeSer).getGeneratedTs
+        override def onEvent(
+            t: RowData,
+            l: Long,
+            watermarkOutput: WatermarkOutput
+        ): Unit = {
+          val ts = t
+            .getRawValue(t.getArity - 1)
+            .toObject(versionTypeSer)
+            .getGeneratedTs
           if (currTs < ts) {
             currTs = ts
             watermarkOutput.emitWatermark(new Watermark(ts))
@@ -68,7 +94,9 @@ class UnifiedTableSource(
       }
 
       val watermarkGeneratorSupplier = new WatermarkGeneratorSupplier[RowData] {
-        override def createWatermarkGenerator(context: WatermarkGeneratorSupplier.Context): WatermarkGenerator[RowData] = {
+        override def createWatermarkGenerator(
+            context: WatermarkGeneratorSupplier.Context
+        ): WatermarkGenerator[RowData] = {
           watermarkGenerator
         }
       }
@@ -100,24 +128,26 @@ class UnifiedTableSource(
     override def isBounded: Boolean = false
   }
 
+  override def getChangelogMode: ChangelogMode =
+    ChangelogMode
+      .newBuilder()
+      .addContainedKind(RowKind.DELETE)
+      .addContainedKind(RowKind.INSERT)
+      .addContainedKind(RowKind.UPDATE_AFTER)
+      .addContainedKind(RowKind.UPDATE_BEFORE)
+      .build()
 
-  override def getChangelogMode: ChangelogMode = ChangelogMode
-    .newBuilder()
-    .addContainedKind(RowKind.DELETE)
-    .addContainedKind(RowKind.INSERT)
-    .addContainedKind(RowKind.UPDATE_AFTER)
-    .addContainedKind(RowKind.UPDATE_BEFORE)
-    .build()
-
-  override def getScanRuntimeProvider(scanContext: ScanTableSource.ScanContext): ScanTableSource.ScanRuntimeProvider = {
+  override def getScanRuntimeProvider(
+      scanContext: ScanTableSource.ScanContext
+  ): ScanTableSource.ScanRuntimeProvider = {
 
     val dataType = tableSchema.toPhysicalRowDataType;
 
-    val versionedDeserializationSchema = decodingFormat.createRuntimeDecoder(scanContext, dataType)
+    val versionedDeserializationSchema =
+      decodingFormat.createRuntimeDecoder(scanContext, dataType)
     val versionTypeSer = versionedDeserializationSchema.getVersionTypeSerializer
     val changlogOutputRowType = versionedDeserializationSchema.getActualRowType
     val outputRowType = dataType.getLogicalType.asInstanceOf[RowType]
-
 
     new UnifiedDataStreamScanProvider(
       bulkSource.getScanRuntimeProvider(scanContext),

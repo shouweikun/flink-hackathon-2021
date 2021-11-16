@@ -1,7 +1,5 @@
 package com.neighborhood.aka.laplace.hackathon;
 
-import com.neighborhood.aka.laplace.hackathon.VersionedDeserializationSchema;
-import com.neighborhood.aka.laplace.hackathon.version.Versioned;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.table.data.GenericRowData;
@@ -10,23 +8,23 @@ import org.apache.flink.table.data.utils.JoinedRowData;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.util.Collector;
 
+import com.neighborhood.aka.laplace.hackathon.version.Versioned;
+
 import java.io.IOException;
 import java.util.Collection;
 import java.util.Iterator;
 
-public abstract class AbstractVersionedDeserializationSchema implements VersionedDeserializationSchema {
+public abstract class AbstractVersionedDeserializationSchema
+        implements VersionedDeserializationSchema {
 
     private final RowType rowType;
     private final TypeSerializer<Versioned> versionTypeSerializer;
 
     public AbstractVersionedDeserializationSchema(
-            RowType rowType,
-            TypeSerializer<Versioned> versionTypeSerializer
-    ) {
+            RowType rowType, TypeSerializer<Versioned> versionTypeSerializer) {
         this.rowType = rowType;
         this.versionTypeSerializer = versionTypeSerializer;
     }
-
 
     @Override
     public RowType getRowDataType() {
@@ -37,7 +35,6 @@ public abstract class AbstractVersionedDeserializationSchema implements Versione
     public TypeSerializer<Versioned> getVersionTypeSerializer() {
         return this.versionTypeSerializer;
     }
-
 
     @Override
     public void deserialize(byte[] message, Collector<RowData> out) throws IOException {

@@ -1,3 +1,4 @@
+/* (C)2021 */
 package com.neighborhood.aka.lapalce.hackathon.integrate
 
 import com.neighborhood.aka.laplace.hackathon.util.RowDataUtils
@@ -10,7 +11,10 @@ import org.apache.flink.streaming.api.functions.co.KeyedCoProcessFunction
 import org.apache.flink.table.api.TableConfig
 import org.apache.flink.table.data.RowData
 import org.apache.flink.table.data.utils.JoinedRowData
-import org.apache.flink.table.planner.codegen.{CodeGeneratorContext, ProjectionCodeGenerator}
+import org.apache.flink.table.planner.codegen.{
+  CodeGeneratorContext,
+  ProjectionCodeGenerator
+}
 import org.apache.flink.table.runtime.generated.Projection
 import org.apache.flink.table.types.logical.RowType
 import org.apache.flink.types.RowKind
@@ -19,13 +23,13 @@ import org.apache.flink.util.Collector
 import java.lang.{Boolean => JBoolean, Long => JLong}
 
 class DataIntegrateKeyedCoProcessFunction(
-                                           private val fixedDelay: Long,
-                                           private val versionTypeSer: TypeSerializer[Versioned],
-                                           private val changelogInputRowType: RowType,
-                                           private val outputRowType: RowType,
-                                           private val outputTypeInformation: TypeInformation[RowData],
-                                           private val versionTypeInformation: TypeInformation[Versioned]
-                                         ) extends KeyedCoProcessFunction[RowData, RowData, RowData, RowData] {
+    private val fixedDelay: Long,
+    private val versionTypeSer: TypeSerializer[Versioned],
+    private val changelogInputRowType: RowType,
+    private val outputRowType: RowType,
+    private val outputTypeInformation: TypeInformation[RowData],
+    private val versionTypeInformation: TypeInformation[Versioned]
+) extends KeyedCoProcessFunction[RowData, RowData, RowData, RowData] {
 
   private var bulkDataProcessed: ValueState[JBoolean] = _
   private var bulkData: ValueState[RowData] = _
@@ -34,25 +38,40 @@ class DataIntegrateKeyedCoProcessFunction(
 
   private var copyRowProjection: Projection[RowData, RowData] = _
 
-
   override def open(parameters: Configuration): Unit = {
 
-    bulkDataProcessed = getRuntimeContext.getState(new ValueStateDescriptor("b-d-p", Types.BOOLEAN))
-    bulkData = getRuntimeContext.getState(new ValueStateDescriptor("b-d", outputTypeInformation))
-    changelogVersion = getRuntimeContext.getState(new ValueStateDescriptor[Versioned]("c-l-v", versionTypeInformation))
-    registeredTime = getRuntimeContext.getState(new ValueStateDescriptor[JLong]("r-t", Types.LONG))
+    bulkDataProcessed = getRuntimeContext.getState(
+      new ValueStateDescriptor("b-d-p", Types.BOOLEAN)
+    )
+    bulkData = getRuntimeContext.getState(
+      new ValueStateDescriptor("b-d", outputTypeInformation)
+    )
+    changelogVersion = getRuntimeContext.getState(
+      new ValueStateDescriptor[Versioned]("c-l-v", versionTypeInformation)
+    )
+    registeredTime = getRuntimeContext.getState(
+      new ValueStateDescriptor[JLong]("r-t", Types.LONG)
+    )
 
     copyRowProjection = ProjectionCodeGenerator
-      .generateProjection(CodeGeneratorContext.apply(new TableConfig), "CopyRowProjection", changelogInputRowType, outputRowType, (0 until outputRowType.getFieldCount).toArray)
+      .generateProjection(
+        CodeGeneratorContext.apply(new TableConfig),
+        "CopyRowProjection",
+        changelogInputRowType,
+        outputRowType,
+        (0 until outputRowType.getFieldCount).toArray
+      )
       .newInstance(Thread.currentThread.getContextClassLoader)
       .asInstanceOf[Projection[RowData, RowData]]
   }
 
-  override def close(): Unit = {
+  override def close(): Unit = {}
 
-  }
-
-  override def processElement1(in1: RowData, context: KeyedCoProcessFunction[RowData, RowData, RowData, RowData]#Context, collector: Collector[RowData]): Unit = {
+  override def processElement1(
+      in1: RowData,
+      context: KeyedCoProcessFunction[RowData, RowData, RowData, RowData]#Context,
+      collector: Collector[RowData]
+  ): Unit = {
     if (getLastChangelogVersion() == null && !hasProcessedBulkData() && getRegisteredTime() == null) {
       val currProcessingTime = context.timerService().currentProcessingTime()
       val triggerTime = currProcessingTime + fixedDelay
@@ -62,8 +81,11 @@ class DataIntegrateKeyedCoProcessFunction(
     }
   }
 
-
-  override def onTimer(timestamp: Long, ctx: KeyedCoProcessFunction[RowData, RowData, RowData, RowData]#OnTimerContext, out: Collector[RowData]): Unit = {
+  override def onTimer(
+      timestamp: Long,
+      ctx: KeyedCoProcessFunction[RowData, RowData, RowData, RowData]#OnTimerContext,
+      out: Collector[RowData]
+  ): Unit = {
     if (getLastChangelogVersion() == null) {
       out.collect(getBulkData())
       bulkDataProcessed.update(true)
@@ -73,7 +95,11 @@ class DataIntegrateKeyedCoProcessFunction(
 
   }
 
-  override def processElement2(in2: RowData, context: KeyedCoProcessFunction[RowData, RowData, RowData, RowData]#Context, collector: Collector[RowData]): Unit = {
+  override def processElement2(
+      in2: RowData,
+      context: KeyedCoProcessFunction[RowData, RowData, RowData, RowData]#Context,
+      collector: Collector[RowData]
+  ): Unit = {
 
     val lastChangelogVersion = getLastChangelogVersion()
     val currChangelogVersion = getChangelogVersionRowDataFromRowData(in2)
@@ -83,7 +109,8 @@ class DataIntegrateKeyedCoProcessFunction(
 
     def collectRow = collector.collect(projectedRow)
 
-    def clearBulkDataProcessed = bulkDataProcessed.clear() // cuz no more used anymore
+    def clearBulkDataProcessed =
+      bulkDataProcessed.clear() // cuz no more used anymore
 
     def updateChangelogVersion = changelogVersion.update(currChangelogVersion)
 
@@ -97,7 +124,9 @@ class DataIntegrateKeyedCoProcessFunction(
         }
         updateChangelogVersion
       case (true, false) =>
-        assert(in2.getRowKind != RowKind.INSERT && in2.getRowKind != RowKind.DELETE)
+        assert(
+          in2.getRowKind != RowKind.INSERT && in2.getRowKind != RowKind.DELETE
+        )
         collectRow
         updateChangelogVersion
         clearBulkDataProcessed
@@ -119,24 +148,34 @@ class DataIntegrateKeyedCoProcessFunction(
     }
   }
 
-  private[integrate] def getChangelogVersionRowDataFromRowData(in: RowData): Versioned = {
+  private[integrate] def getChangelogVersionRowDataFromRowData(
+      in: RowData
+  ): Versioned = {
 
     in.getRawValue[Versioned](in.getArity - 1).toObject(versionTypeSer)
   }
 
-  private[integrate] def getLastChangelogVersion(versionState: ValueState[Versioned] = this.changelogVersion): Versioned = {
+  private[integrate] def getLastChangelogVersion(
+      versionState: ValueState[Versioned] = this.changelogVersion
+  ): Versioned = {
     versionState.value()
   }
 
-  private[integrate] def hasProcessedBulkData(bulkDataProcessed: ValueState[JBoolean] = this.bulkDataProcessed): Boolean = {
+  private[integrate] def hasProcessedBulkData(
+      bulkDataProcessed: ValueState[JBoolean] = this.bulkDataProcessed
+  ): Boolean = {
     Option(bulkDataProcessed.value()).map(_.booleanValue()).getOrElse(false)
   }
 
-  private[integrate] def getRegisteredTime(registeredTime: ValueState[JLong] = this.registeredTime): JLong = {
+  private[integrate] def getRegisteredTime(
+      registeredTime: ValueState[JLong] = this.registeredTime
+  ): JLong = {
     registeredTime.value()
   }
 
-  private[integrate] def getBulkData(bulkData: ValueState[RowData] = this.bulkData): RowData = {
+  private[integrate] def getBulkData(
+      bulkData: ValueState[RowData] = this.bulkData
+  ): RowData = {
     bulkData.value()
   }
 

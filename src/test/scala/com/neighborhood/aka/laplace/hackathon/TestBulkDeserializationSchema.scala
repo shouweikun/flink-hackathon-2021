@@ -1,3 +1,4 @@
+/* (C)2021 */
 package com.neighborhood.aka.laplace.hackathon
 
 import org.apache.flink.api.common.serialization.DeserializationSchema
@@ -7,12 +8,15 @@ import org.apache.flink.table.runtime.typeutils.InternalTypeInfo
 import org.apache.flink.table.types.logical.RowType
 import org.apache.flink.util.Collector
 
-class TestBulkDeserializationSchema(val rowType: RowType) extends DeserializationSchema[RowData] {
+class TestBulkDeserializationSchema(val rowType: RowType)
+    extends DeserializationSchema[RowData] {
 
   override def deserialize(bytes: Array[Byte]): RowData = ???
 
-
-  override def deserialize(message: Array[Byte], out: Collector[RowData]): Unit = {
+  override def deserialize(
+      message: Array[Byte],
+      out: Collector[RowData]
+  ): Unit = {
     TestData.BULK_DATA.foreach {
       case (_, k, v) =>
         val data = new GenericRowData(2)
@@ -24,5 +28,6 @@ class TestBulkDeserializationSchema(val rowType: RowType) extends Deserializatio
 
   override def isEndOfStream(t: RowData): Boolean = false
 
-  override def getProducedType: TypeInformation[RowData] = InternalTypeInfo.of(rowType)
+  override def getProducedType: TypeInformation[RowData] =
+    InternalTypeInfo.of(rowType)
 }

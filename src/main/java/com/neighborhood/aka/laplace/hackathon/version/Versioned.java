@@ -8,8 +8,7 @@ public final class Versioned implements Comparable<Versioned>, Serializable {
 
     private long unifiedVersion;
 
-    public Versioned() {
-    }
+    public Versioned() {}
 
     public long getGeneratedTs() {
         return generatedTs;

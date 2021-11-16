@@ -1,3 +1,4 @@
+/* (C)2021 */
 package com.neighborhood.aka.laplace.hackathon
 
 import com.neighborhood.aka.laplace.hackathon.version.Versioned
@@ -13,18 +14,24 @@ import java.util.Collections
 import scala.collection.JavaConversions._
 
 class TestChangelogDeserializationSchema(
-                                          val rowType: RowType,
-                                          val versionTypeSerializer: TypeSerializer[Versioned]
-                                        ) extends AbstractVersionedDeserializationSchema(rowType, versionTypeSerializer) {
+    val rowType: RowType,
+    val versionTypeSerializer: TypeSerializer[Versioned]
+) extends AbstractVersionedDeserializationSchema(
+      rowType,
+      versionTypeSerializer
+    ) {
 
   private var data: List[(String, Int, Int, Long)] = _
 
-
-  override def open(context: DeserializationSchema.InitializationContext): Unit = {
+  override def open(
+      context: DeserializationSchema.InitializationContext
+  ): Unit = {
     data = TestData.CHANGELOG_DATA
   }
 
-  override protected def deserializeInternal(bytes: Array[Byte]): util.Collection[tuple.Tuple2[RowData, Versioned]] = {
+  override protected def deserializeInternal(
+      bytes: Array[Byte]
+  ): util.Collection[tuple.Tuple2[RowData, Versioned]] = {
     data match {
       case List.empty =>
         Collections.emptyList()
@@ -38,8 +45,8 @@ class TestChangelogDeserializationSchema(
         version.setGeneratedTs(ts)
         version.setUnifiedVersion(ts)
         rowKindStr.trim match {
-          case "i" => row.setRowKind(RowKind.INSERT)
-          case "d" => row.setRowKind(RowKind.DELETE)
+          case "i"  => row.setRowKind(RowKind.INSERT)
+          case "d"  => row.setRowKind(RowKind.DELETE)
           case "-u" => row.setRowKind(RowKind.UPDATE_BEFORE)
           case "+u" => row.setRowKind(RowKind.UPDATE_AFTER)
         }
