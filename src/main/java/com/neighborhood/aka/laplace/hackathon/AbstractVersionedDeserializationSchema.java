@@ -3,6 +3,7 @@ package com.neighborhood.aka.laplace.hackathon;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.table.data.GenericRowData;
+import org.apache.flink.table.data.RawValueData;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.data.utils.JoinedRowData;
 import org.apache.flink.table.types.logical.RowType;
@@ -41,7 +42,9 @@ public abstract class AbstractVersionedDeserializationSchema
         Iterator<Tuple2<RowData, Versioned>> iterator = deserializeInternal(message).iterator();
         while (iterator.hasNext()) {
             Tuple2<RowData, Versioned> curr = iterator.next();
-            out.collect(new JoinedRowData(curr.f0, GenericRowData.of(curr.f1)));
+            JoinedRowData row = new JoinedRowData(curr.f0, GenericRowData.of(RawValueData.fromObject(curr.f1)));
+            row.setRowKind(curr.f0.getRowKind());
+            out.collect(row);
         }
     }
 

@@ -101,6 +101,7 @@ class DataIntegrateKeyedCoProcessFunction(
       collector: Collector[RowData]
   ): Unit = {
 
+    val rowkind = in2.getRowKind
     val lastChangelogVersion = getLastChangelogVersion()
     val currChangelogVersion = getChangelogVersionRowDataFromRowData(in2)
     lazy val projectedRow = projectRowData(in2)
@@ -140,12 +141,14 @@ class DataIntegrateKeyedCoProcessFunction(
   }
 
   private[integrate] def projectRowData(in: RowData): RowData = {
-    in match {
+    val re = in match {
       case joinedRowData: JoinedRowData =>
         RowDataUtils.getRow1FromJoinedRowData(joinedRowData)
       case _ =>
         copyRowProjection.apply(in)
     }
+    re.setRowKind(in.getRowKind)
+    re
   }
 
   private[integrate] def getChangelogVersionRowDataFromRowData(

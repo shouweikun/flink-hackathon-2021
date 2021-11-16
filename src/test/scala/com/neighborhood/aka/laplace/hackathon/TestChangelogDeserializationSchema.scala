@@ -23,15 +23,10 @@ class TestChangelogDeserializationSchema(
 
   private var data: List[(String, Int, Int, Long)] = _
 
-  override def open(
-      context: DeserializationSchema.InitializationContext
-  ): Unit = {
-    data = TestData.CHANGELOG_DATA
-  }
-
   override protected def deserializeInternal(
       bytes: Array[Byte]
   ): java.util.Collection[tuple.Tuple2[RowData, Versioned]] = {
+    if (data == null) data = TestData.CHANGELOG_DATA
     data match {
       case Nil =>
         Collections.emptyList()

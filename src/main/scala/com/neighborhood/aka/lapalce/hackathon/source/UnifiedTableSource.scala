@@ -54,7 +54,7 @@ class UnifiedTableSource(
       val realtimeChangelogSource = createSource(
         streamExecutionEnvironment,
         realtimeChangelogSourceProvider,
-        Option(outputTypeInformation)
+        Option(InternalTypeInfo.of(changelogInputRowType))
       )
       val primaryKeys = TableSchemaUtils.getPrimaryKeyIndices(tableSchema)
       val bulkKeySelector = KeySelectorUtil.getRowDataSelector(
