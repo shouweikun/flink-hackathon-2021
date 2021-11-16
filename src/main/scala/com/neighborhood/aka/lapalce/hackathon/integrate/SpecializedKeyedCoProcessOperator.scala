@@ -21,7 +21,8 @@ class SpecializedKeyedCoProcessOperator[K, IN1, IN2, OUT](
 
   override def open(): Unit = {
 
-    val field = classOf[AbstractStreamOperator[_]].getDeclaredField("input1Watermark")
+    val field =
+      classOf[AbstractStreamOperator[_]].getDeclaredField("input1Watermark")
     field.setAccessible(true)
     field.setLong(this, Long.MaxValue)
 

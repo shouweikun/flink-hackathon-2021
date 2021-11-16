@@ -5,14 +5,18 @@ import org.apache.flink.api.common.serialization.DeserializationSchema
 import org.apache.flink.api.common.typeinfo.TypeInformation
 import org.apache.flink.api.java.typeutils.ResultTypeQueryable
 import org.apache.flink.configuration.Configuration
-import org.apache.flink.streaming.api.functions.source.{RichSourceFunction, SourceFunction}
+import org.apache.flink.streaming.api.functions.source.{
+  RichSourceFunction,
+  SourceFunction
+}
 import org.apache.flink.table.data.RowData
 import org.apache.flink.util.Collector
 
 import java.util.concurrent.atomic.AtomicBoolean
 
 class DummySourceFunction(val der: DeserializationSchema[RowData])
-    extends RichSourceFunction[RowData] with ResultTypeQueryable[RowData]{
+    extends RichSourceFunction[RowData]
+    with ResultTypeQueryable[RowData] {
 
   private final val running = new AtomicBoolean(false)
 

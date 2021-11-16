@@ -42,7 +42,8 @@ public abstract class AbstractVersionedDeserializationSchema
         Iterator<Tuple2<RowData, Versioned>> iterator = deserializeInternal(message).iterator();
         while (iterator.hasNext()) {
             Tuple2<RowData, Versioned> curr = iterator.next();
-            JoinedRowData row = new JoinedRowData(curr.f0, GenericRowData.of(RawValueData.fromObject(curr.f1)));
+            JoinedRowData row =
+                    new JoinedRowData(curr.f0, GenericRowData.of(RawValueData.fromObject(curr.f1)));
             row.setRowKind(curr.f0.getRowKind());
             out.collect(row);
         }
