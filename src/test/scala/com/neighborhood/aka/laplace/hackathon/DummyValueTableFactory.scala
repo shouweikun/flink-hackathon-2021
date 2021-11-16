@@ -13,6 +13,7 @@ import org.apache.flink.table.connector.source.{
 }
 import org.apache.flink.table.data.RowData
 import org.apache.flink.table.factories.{
+  DeserializationFormatFactory,
   DeserializationSchemaFactory,
   DynamicTableFactory,
   DynamicTableSourceFactory,
@@ -62,22 +63,19 @@ class DummyValueTableFactory extends DynamicTableSourceFactory {
 
   override def factoryIdentifier(): String = "dummy"
 
-  override def requiredOptions(): util.Set[ConfigOption[_]] =
-    Set[ConfigOption[_]]()
+  override def requiredOptions() = new java.util.HashSet[ConfigOption[_]]()
 
-  override def optionalOptions(): util.Set[ConfigOption[_]] =
-    Set[ConfigOption[_]]()
+  override def optionalOptions() = new java.util.HashSet[ConfigOption[_]]()
 
   override def createDynamicTableSource(
       context: DynamicTableFactory.Context
   ): DynamicTableSource = {
     val helper = FactoryUtil.createTableFactoryHelper(this, context)
-    val decodingFormat = helper.discoverDecodingFormat[DeserializationSchema[
-      RowData
-    ], DeserializationSchemaFactory[RowData]](
-      classOf[DeserializationSchemaFactory[RowData]],
-      FactoryUtil.FORMAT
-    )
+    val decodingFormat = helper
+      .discoverDecodingFormat[DeserializationSchema[RowData], DeserializationFormatFactory](
+        classOf[DeserializationFormatFactory],
+        FactoryUtil.FORMAT
+      )
     new DummyDynamicTableSource(
       decodingFormat,
       context.getCatalogTable.getSchema

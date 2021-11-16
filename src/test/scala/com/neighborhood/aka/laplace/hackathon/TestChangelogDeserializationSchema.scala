@@ -31,9 +31,9 @@ class TestChangelogDeserializationSchema(
 
   override protected def deserializeInternal(
       bytes: Array[Byte]
-  ): util.Collection[tuple.Tuple2[RowData, Versioned]] = {
+  ): java.util.Collection[tuple.Tuple2[RowData, Versioned]] = {
     data match {
-      case List.empty =>
+      case Nil =>
         Collections.emptyList()
       case head :: tail =>
         data = tail

@@ -53,9 +53,6 @@ class TestChangelogDecodingFormatFactory
 
   override def factoryIdentifier(): String = "TEST-CHANGELOG"
 
-  override def requiredOptions(): util.Set[ConfigOption[_]] =
-    new util.HashSet[ConfigOption[_]]()
-
-  override def optionalOptions(): util.Set[ConfigOption[_]] =
-    new util.HashSet[ConfigOption[_]]()
+  override def requiredOptions() = new java.util.HashSet[ConfigOption[_]]()
+  override def optionalOptions() = new java.util.HashSet[ConfigOption[_]]()
 }
