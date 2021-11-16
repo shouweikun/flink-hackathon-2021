@@ -47,7 +47,7 @@ class UnifiedTableITTest extends TestBase {
         """
     tEnv.executeSql(createTableSql)
 
-    tEnv.executeSql(s"select * from $sourceTableName").print()
+    tEnv.executeSql(s"select count(*) from $sourceTableName").print()
   }
 
 }

@@ -32,4 +32,14 @@ public final class Versioned implements Comparable<Versioned>, Serializable {
     public int compareTo(Versioned o) {
         return Long.compare(this.unifiedVersion, o.unifiedVersion);
     }
+
+    @Override
+    public String toString() {
+        return "Versioned{"
+                + "generatedTs="
+                + generatedTs
+                + ", unifiedVersion="
+                + unifiedVersion
+                + '}';
+    }
 }

@@ -19,6 +19,7 @@ import org.apache.flink.table.runtime.generated.Projection
 import org.apache.flink.table.types.logical.RowType
 import org.apache.flink.types.RowKind
 import org.apache.flink.util.Collector
+import org.slf4j.LoggerFactory
 
 import java.lang.{Boolean => JBoolean, Long => JLong}
 
@@ -30,6 +31,9 @@ class DataIntegrateKeyedCoProcessFunction(
     private val outputTypeInformation: TypeInformation[RowData],
     private val versionTypeInformation: TypeInformation[Versioned]
 ) extends KeyedCoProcessFunction[RowData, RowData, RowData, RowData] {
+
+  private final val logger =
+    LoggerFactory.getLogger(classOf[DataIntegrateKeyedCoProcessFunction])
 
   private var bulkDataProcessed: ValueState[JBoolean] = _
   private var bulkData: ValueState[RowData] = _
@@ -101,7 +105,6 @@ class DataIntegrateKeyedCoProcessFunction(
       collector: Collector[RowData]
   ): Unit = {
 
-    val rowkind = in2.getRowKind
     val lastChangelogVersion = getLastChangelogVersion()
     val currChangelogVersion = getChangelogVersionRowDataFromRowData(in2)
     lazy val projectedRow = projectRowData(in2)
@@ -135,6 +138,10 @@ class DataIntegrateKeyedCoProcessFunction(
         if (currChangelogVersion.compareTo(lastChangelogVersion) > 0) {
           collectRow
           updateChangelogVersion
+        } else {
+          logger.info(
+            s"get older version:$currChangelogVersion, last version is:$lastChangelogVersion"
+          )
         }
     }
 

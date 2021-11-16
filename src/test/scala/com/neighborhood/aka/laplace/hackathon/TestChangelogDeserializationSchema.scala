@@ -12,6 +12,7 @@ import org.apache.flink.types.RowKind
 import java.util
 import java.util.Collections
 import scala.collection.JavaConversions._
+import scala.util.Try
 
 class TestChangelogDeserializationSchema(
     val rowType: RowType,
@@ -26,6 +27,7 @@ class TestChangelogDeserializationSchema(
   override protected def deserializeInternal(
       bytes: Array[Byte]
   ): java.util.Collection[tuple.Tuple2[RowData, Versioned]] = {
+    Try(Thread.sleep(200))
     if (data == null) data = TestData.CHANGELOG_DATA
     data match {
       case Nil =>
