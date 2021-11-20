@@ -45,6 +45,9 @@ class UnifiedTableITTest extends TestBase {
         .key()}' = 'TEST-BULK'
          )
         """
+
+    println(createTableSql)
+
     tEnv.executeSql(createTableSql)
 
     tEnv.executeSql(s"select count(*) from $sourceTableName").print()

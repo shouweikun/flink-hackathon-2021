@@ -29,7 +29,9 @@ class UnifiedTableSource(
     private val realtimeChangelogSource: ScanTableSource,
     private val tableSchema: TableSchema,
     private val decodingFormat: DecodingFormat[VersionedDeserializationSchema],
-    private val fixedDelay: Long
+    private val fixedDelay: Long,
+    private val bulkParallelism: Option[Int],
+    private val changelogParallelism: Int
 ) extends ScanTableSource {
 
   private[source] class UnifiedDataStreamScanProvider(
@@ -104,7 +106,12 @@ class UnifiedTableSource(
         }
       }
 
-      bulkSource
+      realtimeChangelogSource.getTransformation.setParallelism(
+        changelogParallelism
+      )
+      bulkParallelism.foreach(bulkSource.getTransformation.setParallelism)
+
+      val process = bulkSource
         .connect(
           realtimeChangelogSource
             .assignTimestampsAndWatermarks(
@@ -126,6 +133,10 @@ class UnifiedTableSource(
             )
           )
         )
+
+      process.setParallelism(streamExecutionEnvironment.getParallelism)
+
+      process
     }
 
     override def isBounded: Boolean = false
@@ -169,7 +180,9 @@ class UnifiedTableSource(
     realtimeChangelogSource,
     tableSchema,
     decodingFormat,
-    fixedDelay
+    fixedDelay,
+    bulkParallelism,
+    changelogParallelism
   )
 
   override def asSummaryString(): String = "unified source"

@@ -2,6 +2,9 @@
 package com.neighborhood.aka.lapalce.hackathon
 
 import com.neighborhood.aka.lapalce.hackathon.UnifiedTableFactory.{
+  BULK_PARAL,
+  CHANGELOG_PARAL,
+  CHANGELOG_PREFIX,
   FIXED_DELAY,
   InternalContext,
   getBulkOptions,
@@ -29,7 +32,7 @@ import org.apache.flink.table.factories.{
   FactoryUtil
 }
 
-import java.lang.{Long => JLong}
+import java.lang.{Integer => JInt, Long => JLong}
 import java.util
 import scala.collection.JavaConversions._
 
@@ -83,6 +86,10 @@ class UnifiedTableFactory extends DynamicTableSourceFactory {
 
     val helper = FactoryUtil.createTableFactoryHelper(this, context)
     val fixedDelay = helper.getOptions.get(FIXED_DELAY).longValue()
+    val bulkParallelism = Option(
+      helper.getOptions.getOptional(BULK_PARAL).orElse(null)
+    ).map(_.intValue())
+    val changelogParallelism = helper.getOptions.get(CHANGELOG_PARAL).intValue()
 
     new UnifiedTableSource(
       bulkTableSource.asInstanceOf[ScanTableSource],
@@ -90,7 +97,9 @@ class UnifiedTableFactory extends DynamicTableSourceFactory {
       catalogTable.getSchema,
       changelogFormat
         .asInstanceOf[DecodingFormat[VersionedDeserializationSchema]],
-      fixedDelay
+      fixedDelay,
+      bulkParallelism,
+      changelogParallelism
     )
   }
 
@@ -98,11 +107,13 @@ class UnifiedTableFactory extends DynamicTableSourceFactory {
 
   override def requiredOptions(): util.Set[ConfigOption[_]] =
     Set[ConfigOption[_]](
-      )
+      CHANGELOG_PARAL
+    )
 
   override def optionalOptions(): util.Set[ConfigOption[_]] =
     Set[ConfigOption[_]](
-      FIXED_DELAY
+      FIXED_DELAY,
+      BULK_PARAL
     )
 }
 
@@ -153,6 +164,18 @@ object UnifiedTableFactory {
     .key("fixed-delay")
     .longType()
     .defaultValue(10 * 1000)
+    .withDescription("")
+
+  val CHANGELOG_PARAL: ConfigOption[JInt] = ConfigOptions
+    .key("changelog-parallelism")
+    .intType()
+    .defaultValue(1)
+    .withDescription("")
+
+  val BULK_PARAL: ConfigOption[JInt] = ConfigOptions
+    .key("bulk-parallelism")
+    .intType()
+    .noDefaultValue
     .withDescription("")
 
 }
