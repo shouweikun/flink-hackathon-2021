@@ -77,6 +77,8 @@ public class AlignedTimestampsAndWatermarksOperator<T> extends AbstractStreamOpe
 
     private transient Integer indexOfThisSubtask;
 
+    private transient Boolean reportingLocalWatermarkMessageIsOnTheWay;
+
     /** Whether to emit intermediate watermarks or only one final watermark at the end of input. */
     private final boolean emitProgressiveWatermarks;
 
@@ -151,6 +153,7 @@ public class AlignedTimestampsAndWatermarksOperator<T> extends AbstractStreamOpe
             ReportLocalWatermarkAck watermarkAck = (ReportLocalWatermarkAck) operatorEvent;
             Optional.ofNullable(watermarkAck.getGlobalTs())
                     .ifPresent(ts -> this.globalWatermark = new Watermark(ts));
+            reportingLocalWatermarkMessageIsOnTheWay = false;
         }
     }
 
@@ -170,13 +173,15 @@ public class AlignedTimestampsAndWatermarksOperator<T> extends AbstractStreamOpe
     public void onProcessingTime(long timestamp) throws Exception {
         watermarkGenerator.onPeriodicEmit(wmOutput);
 
-        operatorEventGateway.sendEventToCoordinator(
-                new ReportLocalWatermark(
-                        indexOfThisSubtask,
-                        Optional.ofNullable(currentLocalWatermark)
-                                .map(wm -> wm.getTimestamp())
-                                .orElse(null)));
-
+        if (reportingLocalWatermarkMessageIsOnTheWay == null
+                || (!reportingLocalWatermarkMessageIsOnTheWay)) {
+            operatorEventGateway.sendEventToCoordinator(
+                    new ReportLocalWatermark(
+                            indexOfThisSubtask,
+                            Optional.ofNullable(currentLocalWatermark)
+                                    .map(wm -> wm.getTimestamp())
+                                    .orElse(null)));
+        }
         final long now = getProcessingTimeService().getCurrentProcessingTime();
         getProcessingTimeService().registerTimer(now + watermarkInterval, this);
     }
