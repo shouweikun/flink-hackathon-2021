@@ -134,18 +134,23 @@ public class AlignedTimestampsAndWatermarksOperator<T> extends AbstractStreamOpe
     @Override
     public void handleOperatorEvent(OperatorEvent operatorEvent) {
 
-        if (operatorEvent instanceof LocalWatermarkRequest) {
-            LocalWatermarkRequest request = (LocalWatermarkRequest) operatorEvent;
+        if (operatorEvent instanceof WatermarkAlignRequest) {
+            WatermarkAlignRequest request = (WatermarkAlignRequest) operatorEvent;
 
             Optional.ofNullable(request.getGlobalTs())
                     .ifPresent(ts -> this.globalWatermark = new Watermark(ts));
 
             operatorEventGateway.sendEventToCoordinator(
-                    new LocalWatermarkRequestAck(
+                    new WatermarkAlignAck(
                             indexOfThisSubtask,
                             Optional.ofNullable(currentLocalWatermark)
                                     .map(wm -> wm.getTimestamp())
                                     .orElse(null)));
+
+        } else if (operatorEvent instanceof ReportLocalWatermarkAck) {
+            ReportLocalWatermarkAck watermarkAck = (ReportLocalWatermarkAck) operatorEvent;
+            Optional.ofNullable(watermarkAck.getGlobalTs())
+                    .ifPresent(ts -> this.globalWatermark = new Watermark(ts));
         }
     }
 
@@ -164,6 +169,13 @@ public class AlignedTimestampsAndWatermarksOperator<T> extends AbstractStreamOpe
     @Override
     public void onProcessingTime(long timestamp) throws Exception {
         watermarkGenerator.onPeriodicEmit(wmOutput);
+
+        operatorEventGateway.sendEventToCoordinator(
+                new ReportLocalWatermark(
+                        indexOfThisSubtask,
+                        Optional.ofNullable(currentLocalWatermark)
+                                .map(wm -> wm.getTimestamp())
+                                .orElse(null)));
 
         final long now = getProcessingTimeService().getCurrentProcessingTime();
         getProcessingTimeService().registerTimer(now + watermarkInterval, this);
@@ -234,5 +246,11 @@ public class AlignedTimestampsAndWatermarksOperator<T> extends AbstractStreamOpe
             idle = true;
             statusMaintainer.toggleStreamStatus(StreamStatus.IDLE);
         }
+    }
+
+    public AlignedTimestampsAndWatermarksOperator<T> setOperatorEventGateway(
+            OperatorEventGateway operatorEventGateway) {
+        this.operatorEventGateway = operatorEventGateway;
+        return this;
     }
 }

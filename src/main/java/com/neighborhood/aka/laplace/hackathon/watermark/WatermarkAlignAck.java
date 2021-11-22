@@ -1,13 +1,13 @@
 package com.neighborhood.aka.laplace.hackathon.watermark;
 
-public final class LocalWatermarkRequestAck implements WatermarkAlignEvent {
+public final class WatermarkAlignAck implements WatermarkAlignEvent {
 
     private int subtask;
     private Long localTs;
 
-    public LocalWatermarkRequestAck() {}
+    public WatermarkAlignAck() {}
 
-    public LocalWatermarkRequestAck(int subtask, Long localTs) {
+    public WatermarkAlignAck(int subtask, Long localTs) {
         this.subtask = subtask;
         this.localTs = localTs;
     }
@@ -16,7 +16,7 @@ public final class LocalWatermarkRequestAck implements WatermarkAlignEvent {
         return subtask;
     }
 
-    public LocalWatermarkRequestAck setSubtask(int subtask) {
+    public WatermarkAlignAck setSubtask(int subtask) {
         this.subtask = subtask;
         return this;
     }
@@ -25,7 +25,7 @@ public final class LocalWatermarkRequestAck implements WatermarkAlignEvent {
         return localTs;
     }
 
-    public LocalWatermarkRequestAck setLocalTs(Long localTs) {
+    public WatermarkAlignAck setLocalTs(Long localTs) {
         this.localTs = localTs;
         return this;
     }
