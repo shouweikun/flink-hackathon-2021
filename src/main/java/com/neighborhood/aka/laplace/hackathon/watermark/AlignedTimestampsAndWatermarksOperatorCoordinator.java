@@ -17,7 +17,8 @@ import java.util.Map;
 import java.util.concurrent.*;
 import java.util.stream.Collectors;
 
-public class AlignedTimestampsAndWatermarksOperatorCoordinator implements OperatorCoordinator {
+public class AlignedTimestampsAndWatermarksOperatorCoordinator
+        implements OperatorCoordinator, WatermarkAlignMember {
 
     static class RuntimeContext implements Serializable {
         final Map<Integer, Long> subtaskIdAndLocalWatermark;
@@ -45,6 +46,7 @@ public class AlignedTimestampsAndWatermarksOperatorCoordinator implements Operat
 
     @Override
     public void start() throws Exception {
+        registerOperator(operatorID);
         subtaskGateways = new SubtaskGateway[parallelism];
         context = new RuntimeContext();
         executorService =
@@ -66,11 +68,11 @@ public class AlignedTimestampsAndWatermarksOperatorCoordinator implements Operat
 
         if (operatorEvent instanceof ReportLocalWatermark) {
             ReportLocalWatermark event = (ReportLocalWatermark) operatorEvent;
-            putLocalWatermark(event.getSubtask(), event.getLocalTs());
+            putLocalWatermarkAndUpdateToAlign(event.getSubtask(), event.getLocalTs());
             subtaskGateways[subTaskId].sendEvent(new ReportLocalWatermarkAck(getGlobalWatermark()));
         } else if (operatorEvent instanceof WatermarkAlignAck) {
             WatermarkAlignAck event = (WatermarkAlignAck) operatorEvent;
-            putLocalWatermark(event.getSubtask(), event.getLocalTs());
+            putLocalWatermarkAndUpdateToAlign(event.getSubtask(), event.getLocalTs());
             addAckedSubtask(event.getSubtask());
         }
     }
@@ -98,11 +100,6 @@ public class AlignedTimestampsAndWatermarksOperatorCoordinator implements Operat
                                     .collect(Collectors.toList());
 
                     try {
-
-                        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                        ObjectOutputStream oos = new ObjectOutputStream(baos);
-                        oos.writeObject(runtimeContext);
-
                         for (int index = 0; index < list.size(); index++) {
                             ackList.get(index).get();
                             int count = 0;
@@ -119,6 +116,10 @@ public class AlignedTimestampsAndWatermarksOperatorCoordinator implements Operat
                                 }
                             }
                         }
+                        runtimeContext.ackedSubtask.clear();
+                        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                        ObjectOutputStream oos = new ObjectOutputStream(baos);
+                        oos.writeObject(runtimeContext);
                         result.complete(baos.toByteArray());
                         return null;
                     } catch (Exception e) {
@@ -128,11 +129,14 @@ public class AlignedTimestampsAndWatermarksOperatorCoordinator implements Operat
                 },
                 executorService);
 
+        this.checkpointCoordinatorOnAlignment(checkpointId);
         sendResult.complete(gatewayList);
     }
 
     @Override
-    public void notifyCheckpointComplete(long l) {}
+    public void notifyCheckpointComplete(long checkpointId) {
+        this.notifyCheckpointCompleteOnAlignment(checkpointId);
+    }
 
     @Override
     public void resetToCheckpoint(long checkpointId, @Nullable byte[] checkpointData)
@@ -156,13 +160,23 @@ public class AlignedTimestampsAndWatermarksOperatorCoordinator implements Operat
         subtaskGateways[subTaskId] = subtaskGateway;
     }
 
-    private void putLocalWatermark(Integer subtaskId, Long localWatermark) {
-        this.context.subtaskIdAndLocalWatermark.put(subtaskId, localWatermark);
+    private void putLocalWatermarkAndUpdateToAlign(Integer subtaskId, Long localWatermark) {
+        Map<Integer, Long> subtaskIdAndLocalWatermark = this.context.subtaskIdAndLocalWatermark;
+        if (!subtaskIdAndLocalWatermark.containsKey(subtaskId)) {
+            subtaskIdAndLocalWatermark.put(subtaskId, localWatermark);
+        } else if (subtaskIdAndLocalWatermark.get(subtaskId) < localWatermark) {
+            subtaskIdAndLocalWatermark.put(subtaskId, localWatermark);
+        }
+
+        if (subtaskIdAndLocalWatermark.size() == parallelism) {
+            Long operatorWatermarkTs =
+                    subtaskIdAndLocalWatermark.values().stream().min(Long::compare).orElse(null);
+            putOperatorTs(operatorID, operatorWatermarkTs);
+        }
     }
 
-    private Long getGlobalWatermark() {
-        // todo
-        return null;
+    Long getGlobalWatermark() {
+        return this.getGlobalAlignedWatermarkTs();
     }
 
     private void addAckedSubtask(Integer subtaskId) {
