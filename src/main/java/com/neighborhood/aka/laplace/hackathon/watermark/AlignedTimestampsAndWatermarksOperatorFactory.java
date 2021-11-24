@@ -10,6 +10,8 @@ import org.apache.flink.streaming.api.operators.StreamOperator;
 import org.apache.flink.streaming.api.operators.StreamOperatorParameters;
 import org.apache.flink.streaming.runtime.tasks.ProcessingTimeServiceAware;
 
+import com.neighborhood.aka.lapalce.hackathon.watermark.AlignedTimestampsAndWatermarksOperatorCoordinatorProvider;
+
 public class AlignedTimestampsAndWatermarksOperatorFactory<OUT>
         extends AbstractStreamOperatorFactory<OUT>
         implements CoordinatedOperatorFactory<OUT>, ProcessingTimeServiceAware {
@@ -22,7 +24,7 @@ public class AlignedTimestampsAndWatermarksOperatorFactory<OUT>
 
     @Override
     public OperatorCoordinator.Provider getCoordinatorProvider(String s, OperatorID operatorID) {
-        return null;
+        return new AlignedTimestampsAndWatermarksOperatorCoordinatorProvider(operatorID);
     }
 
     @Override
