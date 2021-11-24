@@ -3,10 +3,16 @@ package com.neighborhood.aka.lapalce.hackathon.integrate
 
 import com.neighborhood.aka.laplace.hackathon.util.RowDataUtils
 import com.neighborhood.aka.laplace.hackathon.version.Versioned
-import org.apache.flink.api.common.state.{ValueState, ValueStateDescriptor}
+import org.apache.flink.api.common.state.{
+  MapState,
+  MapStateDescriptor,
+  ValueState,
+  ValueStateDescriptor
+}
 import org.apache.flink.api.common.typeinfo.{TypeInformation, Types}
 import org.apache.flink.api.common.typeutils.TypeSerializer
 import org.apache.flink.configuration.Configuration
+import org.apache.flink.shaded.guava18.com.google.common.collect.Lists
 import org.apache.flink.streaming.api.functions.co.KeyedCoProcessFunction
 import org.apache.flink.table.api.TableConfig
 import org.apache.flink.table.data.RowData
@@ -22,6 +28,7 @@ import org.apache.flink.util.Collector
 import org.slf4j.LoggerFactory
 
 import java.lang.{Boolean => JBoolean, Long => JLong}
+import java.util.{List => JList}
 
 class DataIntegrateKeyedCoProcessFunction(
     private val fixedDelay: Long,
@@ -29,7 +36,8 @@ class DataIntegrateKeyedCoProcessFunction(
     private val changelogInputRowType: RowType,
     private val outputRowType: RowType,
     private val outputTypeInformation: TypeInformation[RowData],
-    private val versionTypeInformation: TypeInformation[Versioned]
+    private val versionTypeInformation: TypeInformation[Versioned],
+    private val sendDataBehindWatermark: Boolean = false
 ) extends KeyedCoProcessFunction[RowData, RowData, RowData, RowData] {
 
   private final val logger =
@@ -39,6 +47,7 @@ class DataIntegrateKeyedCoProcessFunction(
   private var bulkData: ValueState[RowData] = _
   private var changelogVersion: ValueState[Versioned] = _
   private var registeredTime: ValueState[JLong] = _
+  private var registeredChangelogData: MapState[JLong, JList[RowData]] = _
 
   private var copyRowProjection: Projection[RowData, RowData] = _
 
@@ -55,6 +64,14 @@ class DataIntegrateKeyedCoProcessFunction(
     )
     registeredTime = getRuntimeContext.getState(
       new ValueStateDescriptor[JLong]("r-t", Types.LONG)
+    )
+
+    registeredChangelogData = getRuntimeContext.getMapState(
+      new MapStateDescriptor[JLong, JList[RowData]](
+        "r-c-d",
+        Types.LONG,
+        Types.LIST(outputTypeInformation)
+      )
     )
 
     copyRowProjection = ProjectionCodeGenerator
@@ -90,13 +107,23 @@ class DataIntegrateKeyedCoProcessFunction(
       ctx: KeyedCoProcessFunction[RowData, RowData, RowData, RowData]#OnTimerContext,
       out: Collector[RowData]
   ): Unit = {
-    if (getLastChangelogVersion() == null) {
-      out.collect(getBulkData())
-      bulkDataProcessed.update(true)
+    if (registeredTime.value() != null) {
+      if (getLastChangelogVersion() == null) {
+        out.collect(getBulkData())
+        bulkDataProcessed.update(true)
+      }
+      bulkData.clear()
+      registeredTime.clear()
     }
-    bulkData.clear()
-    registeredTime.clear()
 
+    val data = registeredChangelogData.get(timestamp)
+    if (data != null) {
+      val iter = data.iterator()
+      while (iter.hasNext) {
+        out.collect(iter.next())
+      }
+      registeredChangelogData.remove(timestamp)
+    }
   }
 
   override def processElement2(
@@ -113,6 +140,28 @@ class DataIntegrateKeyedCoProcessFunction(
 
     def collectRow = collector.collect(projectedRow)
 
+    def cacheRowDataAndRegisterTimer = {
+      val ts = currChangelogVersion.getGeneratedTs
+      if (registeredChangelogData.contains(ts)) {
+        val list = registeredChangelogData.get(ts)
+        list.add(projectedRow)
+        registeredChangelogData.put(
+          ts,
+          list
+        )
+      } else {
+        registeredChangelogData.put(ts, Lists.newArrayList(projectedRow))
+      }
+      context.timerService().registerEventTimeTimer(ts)
+    }
+
+    def sendOrCacheRowData =
+      if (sendDataBehindWatermark) {
+        cacheRowDataAndRegisterTimer
+      } else {
+        collectRow
+      }
+
     def clearBulkDataProcessed =
       bulkDataProcessed.clear() // cuz no more used anymore
 
@@ -123,7 +172,7 @@ class DataIntegrateKeyedCoProcessFunction(
         in2.getRowKind match {
           case RowKind.INSERT | RowKind.UPDATE_AFTER =>
             projectedRow.setRowKind(RowKind.INSERT)
-            collectRow
+            sendOrCacheRowData
           case _ =>
         }
         updateChangelogVersion
@@ -131,12 +180,12 @@ class DataIntegrateKeyedCoProcessFunction(
         assert(
           in2.getRowKind != RowKind.INSERT && in2.getRowKind != RowKind.DELETE
         )
-        collectRow
+        sendOrCacheRowData
         updateChangelogVersion
         clearBulkDataProcessed
       case (false, _) =>
         if (currChangelogVersion.compareTo(lastChangelogVersion) > 0) {
-          collectRow
+          sendOrCacheRowData
           updateChangelogVersion
         } else {
           logger.info(
