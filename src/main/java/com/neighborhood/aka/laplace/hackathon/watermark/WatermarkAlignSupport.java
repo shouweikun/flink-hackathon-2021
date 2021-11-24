@@ -55,6 +55,11 @@ class WatermarkAlignSupport {
     }
 
     static Long getGlobalTs() {
+        Long globalTsInternal = getGlobalTsInternal();
+        return globalTsInternal == null ? null : globalTsInternal - 1;
+    }
+
+    static Long getGlobalTsInternal() {
         final CheckpointIdAndAlignTs currentCheckpointIdAndAlignTs =
                 WatermarkAlignSupport.currentCheckpointIdAndAlignTs;
         if (currentCheckpointIdAndAlignTs != null) {
