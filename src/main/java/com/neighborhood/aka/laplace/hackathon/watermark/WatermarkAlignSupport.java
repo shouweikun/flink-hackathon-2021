@@ -71,7 +71,7 @@ class WatermarkAlignSupport {
 
     private WatermarkAlignSupport() {}
 
-    private static CheckpointIdAndAlignTs currentCheckpointIdAndAlignTs = null;
+    @VisibleForTesting static CheckpointIdAndAlignTs currentCheckpointIdAndAlignTs = null;
 
     private static Map<OperatorID, Timestamp> tsMap = new ConcurrentHashMap<>();
 
@@ -126,10 +126,5 @@ class WatermarkAlignSupport {
     @VisibleForTesting
     public static Map<OperatorID, Timestamp> getTsMap() {
         return tsMap;
-    }
-
-    @VisibleForTesting
-    public static CheckpointIdAndAlignTs getCurrentCheckpointIdAndAlignTs() {
-        return currentCheckpointIdAndAlignTs;
     }
 }
