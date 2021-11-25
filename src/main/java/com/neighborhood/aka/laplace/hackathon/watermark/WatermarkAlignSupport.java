@@ -1,5 +1,6 @@
 package com.neighborhood.aka.laplace.hackathon.watermark;
 
+import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 
 import java.util.Map;
@@ -15,6 +16,49 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 class WatermarkAlignSupport {
 
+    public interface Timestamp {
+
+        Long getTs();
+
+        Timestamp EMPTY = EmptyTimestamp.INSTANCE;
+
+        static Timestamp fromTs(Long ts) {
+            if (ts == null) {
+                return Timestamp.EMPTY;
+            } else {
+                return new ConTimestamp(ts);
+            }
+        }
+
+        static Long toTs(Timestamp ts) {
+            return ts.getTs();
+        }
+    }
+
+    static final class ConTimestamp implements Timestamp {
+        private final long ts;
+
+        public ConTimestamp(long ts) {
+            this.ts = ts;
+        }
+
+        @Override
+        public Long getTs() {
+            return ts;
+        }
+    }
+
+    static final class EmptyTimestamp implements Timestamp {
+        public static EmptyTimestamp INSTANCE = new EmptyTimestamp();
+
+        private EmptyTimestamp() {}
+
+        @Override
+        public Long getTs() {
+            return null;
+        }
+    }
+
     private static class CheckpointIdAndAlignTs {
         final Long alignTs;
         final long checkpointId;
@@ -29,14 +73,14 @@ class WatermarkAlignSupport {
 
     private static CheckpointIdAndAlignTs currentCheckpointIdAndAlignTs = null;
 
-    private static Map<OperatorID, Long> tsMap = new ConcurrentHashMap<>();
+    private static Map<OperatorID, Timestamp> tsMap = new ConcurrentHashMap<>();
 
     static void registerOperator(OperatorID operatorID) {
-        tsMap.putIfAbsent(operatorID, null);
+        tsMap.putIfAbsent(operatorID, Timestamp.fromTs(null));
     }
 
     static void putOperatorTs(OperatorID operatorID, Long ts) {
-        tsMap.put(operatorID, ts);
+        tsMap.put(operatorID, Timestamp.fromTs(ts));
     }
 
     static synchronized void checkpointCoordinator(long checkpointId) {
@@ -66,9 +110,9 @@ class WatermarkAlignSupport {
             return currentCheckpointIdAndAlignTs.alignTs;
         } else {
             Long re = null;
-            Set<Map.Entry<OperatorID, Long>> entries = tsMap.entrySet();
-            for (Map.Entry<OperatorID, Long> entry : entries) {
-                Long currValue = entry.getValue();
+            Set<Map.Entry<OperatorID, Timestamp>> entries = tsMap.entrySet();
+            for (Map.Entry<OperatorID, Timestamp> entry : entries) {
+                Long currValue = Timestamp.toTs(entry.getValue());
                 if (currValue == null) {
                     return null;
                 } else {
@@ -77,5 +121,15 @@ class WatermarkAlignSupport {
             }
             return re;
         }
+    }
+
+    @VisibleForTesting
+    public static Map<OperatorID, Timestamp> getTsMap() {
+        return tsMap;
+    }
+
+    @VisibleForTesting
+    public static CheckpointIdAndAlignTs getCurrentCheckpointIdAndAlignTs() {
+        return currentCheckpointIdAndAlignTs;
     }
 }
