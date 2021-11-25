@@ -83,18 +83,24 @@ class WatermarkAlignSupport {
         tsMap.put(operatorID, Timestamp.fromTs(ts));
     }
 
-    static synchronized void checkpointCoordinator(long checkpointId) {
+    static synchronized boolean checkpointCoordinator(long checkpointId) {
         if (currentCheckpointIdAndAlignTs == null
                 || currentCheckpointIdAndAlignTs.checkpointId < checkpointId) {
             currentCheckpointIdAndAlignTs = null;
             currentCheckpointIdAndAlignTs = new CheckpointIdAndAlignTs(getGlobalTs(), checkpointId);
+            return true;
+        } else {
+            return false;
         }
     }
 
-    static synchronized void notifyCheckpointComplete(long checkpointId) {
+    static synchronized boolean notifyCheckpointComplete(long checkpointId) {
         if (currentCheckpointIdAndAlignTs != null
                 && currentCheckpointIdAndAlignTs.checkpointId <= checkpointId) {
             currentCheckpointIdAndAlignTs = null;
+            return true;
+        } else {
+            return false;
         }
     }
 

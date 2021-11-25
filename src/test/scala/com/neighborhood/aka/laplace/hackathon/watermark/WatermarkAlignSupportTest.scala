@@ -5,16 +5,23 @@ import org.junit.{AfterClass, BeforeClass, Test}
 import com.neighborhood.aka.lapalce.hackathon.watermark.TestContext._
 import com.neighborhood.aka.laplace.hackathon.watermark.WatermarkAlignSupport.{
   Timestamp,
+  checkpointCoordinator,
   getGlobalTs,
   getGlobalTsInternal,
-  getTsMap
+  getTsMap,
+  notifyCheckpointComplete
 }
 import org.junit.Assert._
 
 import java.lang.{Long => JLong}
 import WatermarkAlignSupportTest._
 
+import java.util.concurrent.atomic.AtomicLong
+
 object WatermarkAlignSupportTest {
+
+  private val checkpointId = new AtomicLong(0)
+
   private var setupTs: JLong = _
 
   @BeforeClass
@@ -64,6 +71,41 @@ class WatermarkAlignSupportTest {
     WatermarkAlignSupport.putOperatorTs(OP2, setupTs + 11)
     assertEquals(getGlobalTsInternal(), setupTs + 10)
     assertEquals(getGlobalTs(), setupTs + 9)
+  }
+
+  @Test
+  def testSubtaskCheckpointCoordinator(): Unit = {
+
+    checkpointCoordinator(checkpointId.incrementAndGet())
+    assertNotNull(WatermarkAlignSupport.currentCheckpointIdAndAlignTs)
+    assertEquals(
+      WatermarkAlignSupport.currentCheckpointIdAndAlignTs.alignTs,
+      getGlobalTs
+    )
+    assertEquals(
+      WatermarkAlignSupport.currentCheckpointIdAndAlignTs.checkpointId,
+      checkpointId.get()
+    )
+    val before = getGlobalTs
+    WatermarkAlignSupport.putOperatorTs(OP1, setupTs + 100)
+    val after = getGlobalTs
+
+    assertEquals(before, after)
+    assertFalse(checkpointCoordinator(checkpointId.get()))
+  }
+
+  @Test
+  def testNotifyCheckpointComplete(): Unit = {
+    testSubtaskCheckpointCoordinator()
+    assertTrue(notifyCheckpointComplete(checkpointId.get()))
+
+    val before = getGlobalTs
+    WatermarkAlignSupport.putOperatorTs(OP1, setupTs + 1000)
+    WatermarkAlignSupport.putOperatorTs(OP2, setupTs + 1000)
+    val after = getGlobalTs
+
+    assertNotEquals(before, after)
+    assertFalse(notifyCheckpointComplete(checkpointId.get()))
   }
 
 }
