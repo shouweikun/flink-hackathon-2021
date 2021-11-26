@@ -14,7 +14,7 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * <p>see @{@link org.apache.flink.api.common.state.CheckpointListener}'s class-level doc.
  */
-class WatermarkAlignSupport {
+public class WatermarkAlignSupport {
 
     public interface Timestamp {
 

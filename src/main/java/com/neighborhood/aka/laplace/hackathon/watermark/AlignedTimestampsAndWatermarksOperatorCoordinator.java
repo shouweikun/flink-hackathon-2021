@@ -1,5 +1,6 @@
 package com.neighborhood.aka.laplace.hackathon.watermark;
 
+import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.messages.Acknowledge;
 import org.apache.flink.runtime.operators.coordination.OperatorCoordinator;
@@ -48,7 +49,9 @@ public class AlignedTimestampsAndWatermarksOperatorCoordinator
     public void start() throws Exception {
         registerOperator(operatorID);
         subtaskGateways = new SubtaskGateway[parallelism];
-        context = new RuntimeContext();
+        if (context == null) { // if context is not null, it must start from resetToCheckpoint
+            context = new RuntimeContext();
+        }
         executorService =
                 Executors.newSingleThreadExecutor(
                         new ExecutorThreadFactory(
@@ -181,5 +184,10 @@ public class AlignedTimestampsAndWatermarksOperatorCoordinator
 
     private void addAckedSubtask(Integer subtaskId) {
         this.context.ackedSubtask.put(subtaskId, true);
+    }
+
+    @VisibleForTesting
+    public RuntimeContext getRuntimeContext() {
+        return this.context;
     }
 }
