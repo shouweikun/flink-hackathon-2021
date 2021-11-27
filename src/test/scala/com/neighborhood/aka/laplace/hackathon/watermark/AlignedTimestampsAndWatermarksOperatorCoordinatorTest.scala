@@ -7,7 +7,7 @@ import org.apache.flink.runtime.operators.coordination.{
   EventReceivingTasks,
   MockOperatorCoordinatorContext
 }
-import org.junit.Assert.{assertNotNull, assertTrue}
+import org.junit.Assert.{assertEquals, assertNotNull, assertTrue}
 import org.junit.{After, Before, Test}
 
 import java.util.concurrent.{
@@ -24,12 +24,12 @@ class AlignedTimestampsAndWatermarksOperatorCoordinatorTest {
   val NUM_SUBTASKS = 3
   val operatorName = OP1
 
-  // ---- Mocks for the underlying Operator Coordinator Context ---
+  // ---- Mocks for the underlying Coordinator Context ---
   protected var receivingTasks: EventReceivingTasks = null
   protected var operatorCoordinatorContext: MockOperatorCoordinatorContext =
     null
 
-  // ---- Mocks for the Source Coordinator Context ----
+  // ---- Mocks for the Coordinator Context ----
   protected var coordinatorThreadFactory: CoordinatorExecutorThreadFactory =
     null
   protected var coordinatorExecutor: ExecutorService = null
@@ -70,12 +70,58 @@ class AlignedTimestampsAndWatermarksOperatorCoordinatorTest {
     )
   }
 
+  @throws[Exception]
+  def subtaskReady(): Unit = {
+    coordinator.start()
+    setAllReaderTasksReady(coordinator)
+  }
+
+  def setAllReaderTasksReady(): Unit = {
+    setAllReaderTasksReady(coordinator)
+  }
+
+  def setAllReaderTasksReady(
+      coordinator: AlignedTimestampsAndWatermarksOperatorCoordinator
+  ): Unit = {
+    for (i <- 0 until NUM_SUBTASKS) {
+      coordinator.subtaskReady(i, receivingTasks.createGatewayForSubtask(i))
+    }
+  }
+
   @Test
   def testStart(): Unit = {
     coordinator.start()
     val context = coordinator.getRuntimeContext()
     assertNotNull(context)
     assertTrue(WatermarkAlignSupport.getTsMap.containsKey(OP1));
+  }
+
+  @Test
+  def testSubtaskReady: Unit = {
+    subtaskReady()
+    val gateways = coordinator.getSubtaskGateways
+    assertEquals(NUM_SUBTASKS, gateways.length)
+    gateways.foreach(assertNotNull)
+  }
+
+  @Test
+  def testSendOperatorEvent(): Unit = {
+    subtaskReady()
+    val ts = System.currentTimeMillis()
+    (0 until NUM_SUBTASKS).foreach {
+      case index =>
+        coordinator.handleEventFromOperator(
+          index,
+          new ReportLocalWatermark(index, ts)
+        )
+        assertEquals(
+          coordinator.getRuntimeContext.subtaskIdAndLocalWatermark.get(index),
+          ts
+        )
+    }
+    assertEquals(coordinator.computeOperatorTs(), ts)
+    assertEquals(coordinator.getGlobalWatermark, ts - 1)
+
   }
 
 }

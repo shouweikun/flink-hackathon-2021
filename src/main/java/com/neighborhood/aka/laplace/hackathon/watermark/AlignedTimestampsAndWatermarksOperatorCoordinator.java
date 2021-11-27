@@ -171,10 +171,18 @@ public class AlignedTimestampsAndWatermarksOperatorCoordinator
             subtaskIdAndLocalWatermark.put(subtaskId, localWatermark);
         }
 
+        putOperatorTs(operatorID, computeOperatorTs());
+    }
+
+    @VisibleForTesting
+    public Long computeOperatorTs() {
+        Map<Integer, Long> subtaskIdAndLocalWatermark = this.context.subtaskIdAndLocalWatermark;
         if (subtaskIdAndLocalWatermark.size() == parallelism) {
             Long operatorWatermarkTs =
                     subtaskIdAndLocalWatermark.values().stream().min(Long::compare).orElse(null);
-            putOperatorTs(operatorID, operatorWatermarkTs);
+            return operatorWatermarkTs;
+        } else {
+            return null;
         }
     }
 
@@ -189,5 +197,10 @@ public class AlignedTimestampsAndWatermarksOperatorCoordinator
     @VisibleForTesting
     public RuntimeContext getRuntimeContext() {
         return this.context;
+    }
+
+    @VisibleForTesting
+    public OperatorCoordinator.SubtaskGateway[] getSubtaskGateways() {
+        return this.subtaskGateways;
     }
 }
