@@ -7,10 +7,11 @@ import org.apache.flink.runtime.operators.coordination.{
   EventReceivingTasks,
   MockOperatorCoordinatorContext
 }
-import org.junit.Assert.{assertEquals, assertNotNull, assertTrue}
+import org.junit.Assert.{assertEquals, assertNotNull, assertNull, assertTrue}
 import org.junit.{After, Before, Test}
 
 import java.util.concurrent.{
+  CompletableFuture,
   ExecutorService,
   Executors,
   TimeUnit,
@@ -122,6 +123,68 @@ class AlignedTimestampsAndWatermarksOperatorCoordinatorTest {
     assertEquals(coordinator.computeOperatorTs(), ts)
     assertEquals(coordinator.getGlobalWatermark, ts - 1)
 
+    (0 until NUM_SUBTASKS) foreach {
+      case index =>
+        coordinator.handleEventFromOperator(
+          index,
+          new WatermarkAlignAck(index, ts)
+        )
+        assertTrue(
+          coordinator.getRuntimeContext.ackedSubtask.containsKey(index)
+        )
+    }
+
   }
 
+  @Test
+  def testCheckpointCoordinator(): Unit = {
+    subtaskReady()
+    val ts = System.currentTimeMillis()
+    val result = new CompletableFuture[Array[Byte]]
+    coordinator.checkpointCoordinator(1, result)
+    (0 until NUM_SUBTASKS) foreach {
+      case index =>
+        coordinator.handleEventFromOperator(
+          index,
+          new WatermarkAlignAck(index, ts)
+        )
+    }
+    assertNotNull(result.get())
+    assertNull(coordinator.getGlobalWatermark)
+
+    (0 until NUM_SUBTASKS).foreach {
+      case index =>
+        coordinator.handleEventFromOperator(
+          index,
+          new ReportLocalWatermark(index, ts)
+        )
+    }
+    assertNull(coordinator.getGlobalWatermark)
+  }
+
+  @Test
+  def testNotifyCheckpointComplete(): Unit = {
+    subtaskReady()
+    val checkpointId = 1
+    val ts = System.currentTimeMillis()
+    val result = new CompletableFuture[Array[Byte]]()
+    assertNull(coordinator.getGlobalWatermark)
+    coordinator.checkpointCoordinator(checkpointId, result)
+    assertNull(coordinator.getGlobalWatermark)
+    (0 until NUM_SUBTASKS).foreach {
+      case index =>
+        coordinator.handleEventFromOperator(
+          index,
+          new ReportLocalWatermark(index, ts)
+        )
+        coordinator.handleEventFromOperator(
+          index,
+          new WatermarkAlignAck(index, ts)
+        )
+    }
+    assertNull(coordinator.getGlobalWatermark)
+    result.get
+    coordinator.notifyCheckpointComplete(checkpointId)
+    assertEquals(ts, coordinator.getGlobalWatermark + 1)
+  }
 }
