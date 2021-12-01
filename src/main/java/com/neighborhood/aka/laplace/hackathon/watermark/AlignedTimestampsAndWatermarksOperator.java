@@ -17,6 +17,7 @@
 
 package com.neighborhood.aka.laplace.hackathon.watermark;
 
+import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.api.common.eventtime.NoWatermarksGenerator;
 import org.apache.flink.api.common.eventtime.TimestampAssigner;
 import org.apache.flink.api.common.eventtime.Watermark;
@@ -139,8 +140,7 @@ public class AlignedTimestampsAndWatermarksOperator<T> extends AbstractStreamOpe
         if (operatorEvent instanceof WatermarkAlignRequest) {
             WatermarkAlignRequest request = (WatermarkAlignRequest) operatorEvent;
 
-            Optional.ofNullable(request.getGlobalTs())
-                    .ifPresent(ts -> this.globalWatermark = new Watermark(ts));
+            Optional.ofNullable(request.getGlobalTs()).ifPresent(ts -> updateGlobalWatermark(ts));
 
             operatorEventGateway.sendEventToCoordinator(
                     new WatermarkAlignAck(
@@ -152,7 +152,7 @@ public class AlignedTimestampsAndWatermarksOperator<T> extends AbstractStreamOpe
         } else if (operatorEvent instanceof ReportLocalWatermarkAck) {
             ReportLocalWatermarkAck watermarkAck = (ReportLocalWatermarkAck) operatorEvent;
             Optional.ofNullable(watermarkAck.getGlobalTs())
-                    .ifPresent(ts -> this.globalWatermark = new Watermark(ts));
+                    .ifPresent(ts -> updateGlobalWatermark(ts));
             reportingLocalWatermarkMessageIsOnTheWay = false;
         }
     }
@@ -257,5 +257,18 @@ public class AlignedTimestampsAndWatermarksOperator<T> extends AbstractStreamOpe
             OperatorEventGateway operatorEventGateway) {
         this.operatorEventGateway = operatorEventGateway;
         return this;
+    }
+
+    private void updateGlobalWatermark(long ts) {
+        if (globalWatermark == null) {
+            globalWatermark = new Watermark(ts);
+        } else if (globalWatermark.getTimestamp() < ts) {
+            globalWatermark = new Watermark(ts);
+        }
+    }
+
+    @VisibleForTesting
+    public Watermark getCurrentLocalWatermark() {
+        return currentLocalWatermark;
     }
 }
