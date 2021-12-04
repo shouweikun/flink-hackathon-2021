@@ -94,7 +94,8 @@ public class AlignedTimestampsAndWatermarksOperator<T> extends AbstractStreamOpe
     }
 
     @Override
-    public void setup(StreamTask<?, ?> containingTask, StreamConfig config, Output<StreamRecord<T>> output) {
+    public void setup(
+            StreamTask<?, ?> containingTask, StreamConfig config, Output<StreamRecord<T>> output) {
         super.setup(containingTask, config, output);
     }
 

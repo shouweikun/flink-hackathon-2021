@@ -47,7 +47,9 @@ public class AlignedTimestampsAndWatermarksOperatorFactory<IN, OUT>
                             streamOperatorParameters.getOutput());
         }
 
-        streamOperatorParameters.getOperatorEventDispatcher().registerEventHandler(operatorId, operator);
+        streamOperatorParameters
+                .getOperatorEventDispatcher()
+                .registerEventHandler(operatorId, operator);
 
         operator.setOperatorEventGateway(eventDispatcher.getOperatorEventGateway(operatorId));
         return (T) operator;
