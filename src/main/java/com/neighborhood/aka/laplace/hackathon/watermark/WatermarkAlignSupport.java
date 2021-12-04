@@ -106,7 +106,7 @@ public class WatermarkAlignSupport {
 
     static Long getGlobalTs() {
         Long globalTsInternal = getGlobalTsInternal();
-        return globalTsInternal == null ? null : globalTsInternal - 1;
+        return globalTsInternal == null ? null :  (globalTsInternal == Long.MIN_VALUE)?globalTsInternal:globalTsInternal - 1;
     }
 
     static Long getGlobalTsInternal() {

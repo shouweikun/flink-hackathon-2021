@@ -24,9 +24,11 @@ import org.apache.flink.api.common.eventtime.Watermark;
 import org.apache.flink.api.common.eventtime.WatermarkGenerator;
 import org.apache.flink.api.common.eventtime.WatermarkOutput;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
+import org.apache.flink.metrics.MetricGroup;
 import org.apache.flink.runtime.operators.coordination.OperatorEvent;
 import org.apache.flink.runtime.operators.coordination.OperatorEventGateway;
 import org.apache.flink.runtime.operators.coordination.OperatorEventHandler;
+import org.apache.flink.streaming.api.graph.StreamConfig;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.ChainingStrategy;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
@@ -35,6 +37,7 @@ import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.streaming.runtime.streamstatus.StreamStatus;
 import org.apache.flink.streaming.runtime.streamstatus.StreamStatusMaintainer;
 import org.apache.flink.streaming.runtime.tasks.ProcessingTimeCallback;
+import org.apache.flink.streaming.runtime.tasks.StreamTask;
 
 import java.util.Optional;
 
@@ -88,6 +91,11 @@ public class AlignedTimestampsAndWatermarksOperator<T> extends AbstractStreamOpe
         this.watermarkStrategy = checkNotNull(watermarkStrategy);
         this.emitProgressiveWatermarks = emitProgressiveWatermarks;
         this.chainingStrategy = ChainingStrategy.DEFAULT_CHAINING_STRATEGY;
+    }
+
+    @Override
+    public void setup(StreamTask<?, ?> containingTask, StreamConfig config, Output<StreamRecord<T>> output) {
+        super.setup(containingTask, config, output);
     }
 
     @Override
@@ -270,5 +278,12 @@ public class AlignedTimestampsAndWatermarksOperator<T> extends AbstractStreamOpe
     @VisibleForTesting
     public Watermark getCurrentLocalWatermark() {
         return currentLocalWatermark;
+    }
+
+    @Override
+    public MetricGroup getMetricGroup() {
+
+        MetricGroup metricGroup = super.getMetricGroup();
+        return metricGroup;
     }
 }

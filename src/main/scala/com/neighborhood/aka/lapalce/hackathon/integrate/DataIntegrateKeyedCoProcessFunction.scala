@@ -3,30 +3,22 @@ package com.neighborhood.aka.lapalce.hackathon.integrate
 
 import com.neighborhood.aka.laplace.hackathon.util.RowDataUtils
 import com.neighborhood.aka.laplace.hackathon.version.Versioned
-import org.apache.flink.api.common.state.{
-  MapState,
-  MapStateDescriptor,
-  ValueState,
-  ValueStateDescriptor
-}
+import org.apache.flink.api.common.state.{MapState, MapStateDescriptor, ValueState, ValueStateDescriptor}
 import org.apache.flink.api.common.typeinfo.{TypeInformation, Types}
 import org.apache.flink.api.common.typeutils.TypeSerializer
 import org.apache.flink.configuration.Configuration
+import org.apache.flink.runtime.state.internal.InternalKvState
 import org.apache.flink.shaded.guava18.com.google.common.collect.Lists
 import org.apache.flink.streaming.api.functions.co.KeyedCoProcessFunction
 import org.apache.flink.table.api.TableConfig
 import org.apache.flink.table.data.RowData
 import org.apache.flink.table.data.utils.JoinedRowData
-import org.apache.flink.table.planner.codegen.{
-  CodeGeneratorContext,
-  ProjectionCodeGenerator
-}
+import org.apache.flink.table.planner.codegen.{CodeGeneratorContext, ProjectionCodeGenerator}
 import org.apache.flink.table.runtime.generated.Projection
 import org.apache.flink.table.types.logical.RowType
 import org.apache.flink.types.RowKind
 import org.apache.flink.util.Collector
 import org.slf4j.LoggerFactory
-
 import java.lang.{Boolean => JBoolean, Long => JLong}
 import java.util.{List => JList}
 
@@ -107,7 +99,27 @@ class DataIntegrateKeyedCoProcessFunction(
       ctx: KeyedCoProcessFunction[RowData, RowData, RowData, RowData]#OnTimerContext,
       out: Collector[RowData]
   ): Unit = {
-    if (registeredTime.value() != null) {
+
+//    registeredChangelogData.asInstanceOf[InternalKvState[_,RowData,_]].setCurrentNamespace(ctx.getCurrentKey)
+    val data = registeredChangelogData.get(timestamp)
+    var hasChangelogData = false
+    if (data != null) {
+      val iter = data.iterator()
+      while (iter.hasNext) {
+        hasChangelogData = true
+        val curr = iter.next()
+        import scala.collection.JavaConversions._
+        val string = outputRowType.getFields.zipWithIndex.map{
+          case (field, index) => RowData.createFieldGetter(field.getType, index).getFieldOrNull(curr)
+        }.mkString(",")
+        val rowkind = curr.getRowKind
+        println(s"key = ${ctx.getCurrentKey.getInt(0)} on timer ts = $timestamp watermark=${ctx.timerService().currentWatermark()} rowkind = $rowkind, $string, ${curr} ${this.registeredChangelogData.keys().mkString(",")}")
+        out.collect(curr)
+      }
+      registeredChangelogData.remove(timestamp)
+    }
+
+    if (!hasChangelogData && registeredTime.value() != null) {
       if (getLastChangelogVersion() == null) {
         out.collect(getBulkData())
         bulkDataProcessed.update(true)
@@ -116,14 +128,7 @@ class DataIntegrateKeyedCoProcessFunction(
       registeredTime.clear()
     }
 
-    val data = registeredChangelogData.get(timestamp)
-    if (data != null) {
-      val iter = data.iterator()
-      while (iter.hasNext) {
-        out.collect(iter.next())
-      }
-      registeredChangelogData.remove(timestamp)
-    }
+
   }
 
   override def processElement2(
@@ -131,7 +136,7 @@ class DataIntegrateKeyedCoProcessFunction(
       context: KeyedCoProcessFunction[RowData, RowData, RowData, RowData]#Context,
       collector: Collector[RowData]
   ): Unit = {
-
+//    registeredChangelogData.asInstanceOf[InternalKvState[_,RowData,_]].setCurrentNamespace(context.getCurrentKey)
     val lastChangelogVersion = getLastChangelogVersion()
     val currChangelogVersion = getChangelogVersionRowDataFromRowData(in2)
     lazy val projectedRow = projectRowData(in2)
@@ -152,6 +157,11 @@ class DataIntegrateKeyedCoProcessFunction(
       } else {
         registeredChangelogData.put(ts, Lists.newArrayList(projectedRow))
       }
+      import scala.collection.JavaConversions._
+      val string = outputRowType.getFields.zipWithIndex.map{
+        case (field, index) => RowData.createFieldGetter(field.getType, index).getFieldOrNull(projectedRow)
+      }.mkString(",")
+      println(s"key = ${context.getCurrentKey.getInt(0)}, cache row ts=$ts watermark=${context.timerService().currentWatermark()} rowkind=${projectedRow.getRowKind} $string, ${projectedRow},${this.registeredChangelogData.keys().mkString(",")}")
       context.timerService().registerEventTimeTimer(ts)
     }
 
@@ -166,7 +176,10 @@ class DataIntegrateKeyedCoProcessFunction(
       bulkDataProcessed.clear() // cuz no more used anymore
 
     def updateChangelogVersion = changelogVersion.update(currChangelogVersion)
-
+    val watermark = context.timerService().currentWatermark()
+    val id = in2.getInt(0)
+    val entries = this.registeredChangelogData.entries()
+    val rowKind = in2.getRowKind
     (lastVersionIsNull, bulkDataHasNotProcessed) match {
       case (true, true) =>
         in2.getRowKind match {

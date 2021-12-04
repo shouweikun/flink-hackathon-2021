@@ -8,6 +8,7 @@ import com.neighborhood.aka.lapalce.hackathon.integrate.{
 import com.neighborhood.aka.lapalce.hackathon.source.SourceUtils.createSource
 import com.neighborhood.aka.laplace.hackathon.VersionedDeserializationSchema
 import com.neighborhood.aka.laplace.hackathon.version.Versioned
+import com.neighborhood.aka.laplace.hackathon.watermark.AlignedTimestampsAndWatermarksOperatorFactory
 import org.apache.flink.api.common.eventtime._
 import org.apache.flink.api.common.typeinfo.TypeInformation
 import org.apache.flink.api.common.typeutils.TypeSerializer
@@ -31,7 +32,8 @@ class UnifiedTableSource(
     private val decodingFormat: DecodingFormat[VersionedDeserializationSchema],
     private val fixedDelay: Long,
     private val bulkParallelism: Option[Int],
-    private val changelogParallelism: Int
+    private val changelogParallelism: Int,
+    private val watermarkAlign: Boolean
 ) extends ScanTableSource {
 
   private[source] class UnifiedDataStreamScanProvider(
@@ -111,12 +113,24 @@ class UnifiedTableSource(
       )
       bulkParallelism.foreach(bulkSource.getTransformation.setParallelism)
 
+      val watermarked = if (watermarkAlign) {
+        realtimeChangelogSource.transform(
+          "watermarkAlign",
+          realtimeChangelogSource.getTransformation.getOutputType,
+          new AlignedTimestampsAndWatermarksOperatorFactory[RowData, RowData](
+            WatermarkStrategy.forGenerator(watermarkGeneratorSupplier)
+          )
+        )
+      } else {
+        realtimeChangelogSource
+          .assignTimestampsAndWatermarks(
+            WatermarkStrategy.forGenerator(watermarkGeneratorSupplier)
+          )
+      }
+
       val process = bulkSource
         .connect(
-          realtimeChangelogSource
-            .assignTimestampsAndWatermarks(
-              WatermarkStrategy.forGenerator(watermarkGeneratorSupplier)
-            )
+          watermarked
         )
         .keyBy(bulkKeySelector, realtimeKeySelector)
         .transform(
@@ -129,7 +143,8 @@ class UnifiedTableSource(
               changelogInputRowType,
               outputRowType,
               outputTypeInformation,
-              TypeInformation.of(classOf[Versioned])
+              TypeInformation.of(classOf[Versioned]),
+              watermarkAlign
             )
           )
         )
@@ -182,7 +197,8 @@ class UnifiedTableSource(
     decodingFormat,
     fixedDelay,
     bulkParallelism,
-    changelogParallelism
+    changelogParallelism,
+    watermarkAlign
   )
 
   override def asSummaryString(): String = "unified source"

@@ -7,6 +7,7 @@ import com.neighborhood.aka.lapalce.hackathon.UnifiedTableFactory.{
   CHANGELOG_PREFIX,
   FIXED_DELAY,
   InternalContext,
+  WATERMARK_ALIGN,
   getBulkOptions,
   getRealtimeChangeOptions
 }
@@ -32,7 +33,7 @@ import org.apache.flink.table.factories.{
   FactoryUtil
 }
 
-import java.lang.{Integer => JInt, Long => JLong}
+import java.lang.{Boolean => JBoolean, Integer => JInt, Long => JLong}
 import java.util
 import scala.collection.JavaConversions._
 
@@ -90,6 +91,7 @@ class UnifiedTableFactory extends DynamicTableSourceFactory {
       helper.getOptions.getOptional(BULK_PARAL).orElse(null)
     ).map(_.intValue())
     val changelogParallelism = helper.getOptions.get(CHANGELOG_PARAL).intValue()
+    val watermarkAlign = helper.getOptions.get(WATERMARK_ALIGN).booleanValue()
 
     new UnifiedTableSource(
       bulkTableSource.asInstanceOf[ScanTableSource],
@@ -99,7 +101,8 @@ class UnifiedTableFactory extends DynamicTableSourceFactory {
         .asInstanceOf[DecodingFormat[VersionedDeserializationSchema]],
       fixedDelay,
       bulkParallelism,
-      changelogParallelism
+      changelogParallelism,
+      watermarkAlign
     )
   }
 
@@ -176,6 +179,12 @@ object UnifiedTableFactory {
     .key("bulk-parallelism")
     .intType()
     .noDefaultValue
+    .withDescription("")
+
+  val WATERMARK_ALIGN: ConfigOption[JBoolean] = ConfigOptions
+    .key("using-watermark-align")
+    .booleanType()
+    .defaultValue(false)
     .withDescription("")
 
 }

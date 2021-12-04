@@ -72,7 +72,8 @@ public class AlignedTimestampsAndWatermarksOperatorCoordinator
         if (operatorEvent instanceof ReportLocalWatermark) {
             ReportLocalWatermark event = (ReportLocalWatermark) operatorEvent;
             putLocalWatermarkAndUpdateToAlign(event.getSubtask(), event.getLocalTs());
-            subtaskGateways[subTaskId].sendEvent(new ReportLocalWatermarkAck(getGlobalWatermark()));
+            Long globalWatermark = getGlobalWatermark();
+            subtaskGateways[subTaskId].sendEvent(new ReportLocalWatermarkAck(globalWatermark));
         } else if (operatorEvent instanceof WatermarkAlignAck) {
             WatermarkAlignAck event = (WatermarkAlignAck) operatorEvent;
             putLocalWatermarkAndUpdateToAlign(event.getSubtask(), event.getLocalTs());

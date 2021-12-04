@@ -41,6 +41,7 @@ class UnifiedTableITTest extends TestBase {
           '${UnifiedTableFactory.BULK_PREFIX}connector' = 'dummy',
           '${UnifiedTableFactory.CHANGELOG_PREFIX}${FactoryUtil.FORMAT
         .key()}' = 'TEST-CHANGELOG',
+          '${UnifiedTableFactory.WATERMARK_ALIGN.key()}' = 'false',
           '${UnifiedTableFactory.BULK_PREFIX}${FactoryUtil.FORMAT
         .key()}' = 'TEST-BULK'
          )
@@ -51,6 +52,35 @@ class UnifiedTableITTest extends TestBase {
     tEnv.executeSql(createTableSql)
 
     tEnv.executeSql(s"select count(*) from $sourceTableName").print()
+  }
+
+  @Test
+  def testUnifiedTableSourceWithWatermarkAlign(): Unit = {
+
+    val sourceTableName = "source_table"
+    val createTableSql =
+      s"""
+         create table $sourceTableName(
+          k int,
+          v int,
+          primary key(k) not enforced
+         ) with (
+          'connector' = 'unified',
+          '${UnifiedTableFactory.CHANGELOG_PREFIX}connector' = 'dummy',
+          '${UnifiedTableFactory.BULK_PREFIX}connector' = 'dummy',
+          '${UnifiedTableFactory.CHANGELOG_PREFIX}${FactoryUtil.FORMAT
+        .key()}' = 'TEST-CHANGELOG',
+          '${UnifiedTableFactory.WATERMARK_ALIGN.key()}' = 'true',
+          '${UnifiedTableFactory.BULK_PREFIX}${FactoryUtil.FORMAT
+        .key()}' = 'TEST-BULK'
+         )
+        """
+
+    println(createTableSql)
+
+    tEnv.executeSql(createTableSql)
+
+    tEnv.executeSql(s"select distinct(k) from $sourceTableName").print()
   }
 
 }
