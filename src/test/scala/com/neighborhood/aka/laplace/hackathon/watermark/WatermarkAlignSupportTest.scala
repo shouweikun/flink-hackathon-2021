@@ -63,6 +63,11 @@ class WatermarkAlignSupportTest {
 
     WatermarkAlignSupport.putOperatorTs(OP1, null)
     assertEquals(getGlobalTsInternal(), null)
+
+    WatermarkAlignSupport.putOperatorTs(OP1, Long.MinValue)
+    WatermarkAlignSupport.putOperatorTs(OP2, Long.MinValue)
+    assertEquals(getGlobalTsInternal(), Long.MinValue)
+
     WatermarkAlignSupport.putOperatorTs(OP1, setupTs + 10)
     WatermarkAlignSupport.putOperatorTs(OP2, setupTs + 9)
     assertEquals(getGlobalTsInternal(), setupTs + 9)
