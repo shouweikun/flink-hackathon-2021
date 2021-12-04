@@ -8,7 +8,15 @@ public final class Versioned implements Comparable<Versioned>, Serializable {
 
     private long unifiedVersion;
 
-    public Versioned() {}
+    private final boolean isHeartbeat;
+
+    public Versioned() {
+        this(false);
+    }
+
+    public Versioned(boolean isHeartbeat) {
+        this.isHeartbeat = isHeartbeat;
+    }
 
     public long getGeneratedTs() {
         return generatedTs;
@@ -26,6 +34,10 @@ public final class Versioned implements Comparable<Versioned>, Serializable {
     public Versioned setUnifiedVersion(long unifiedVersion) {
         this.unifiedVersion = unifiedVersion;
         return this;
+    }
+
+    public boolean isHeartbeat() {
+        return isHeartbeat;
     }
 
     @Override

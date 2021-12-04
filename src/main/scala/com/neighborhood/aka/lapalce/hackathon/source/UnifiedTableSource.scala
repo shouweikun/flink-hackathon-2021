@@ -10,6 +10,7 @@ import com.neighborhood.aka.laplace.hackathon.VersionedDeserializationSchema
 import com.neighborhood.aka.laplace.hackathon.version.Versioned
 import com.neighborhood.aka.laplace.hackathon.watermark.AlignedTimestampsAndWatermarksOperatorFactory
 import org.apache.flink.api.common.eventtime._
+import org.apache.flink.api.common.functions.FilterFunction
 import org.apache.flink.api.common.typeinfo.TypeInformation
 import org.apache.flink.api.common.typeutils.TypeSerializer
 import org.apache.flink.streaming.api.datastream.DataStream
@@ -128,9 +129,22 @@ class UnifiedTableSource(
           )
       }
 
+      val heartbeatFilter = watermarked.filter(new FilterFunction[RowData] {
+        override def filter(value: RowData): Boolean = {
+          !value
+            .getRawValue(value.getArity)
+            .toObject(versionTypeSer)
+            .isHeartbeat
+        }
+      })
+
+      heartbeatFilter.getTransformation.setOutputType(
+        InternalTypeInfo.of(changelogInputRowType)
+      )
+
       val process = bulkSource
         .connect(
-          watermarked
+          heartbeatFilter
         )
         .keyBy(bulkKeySelector, realtimeKeySelector)
         .transform(
