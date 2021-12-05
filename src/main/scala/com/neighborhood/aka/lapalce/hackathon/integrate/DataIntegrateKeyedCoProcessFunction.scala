@@ -147,6 +147,7 @@ class DataIntegrateKeyedCoProcessFunction(
     val bulkDataHasNotProcessed = !hasProcessedBulkData()
     val lastVersionIsNull = lastChangelogVersion == null
 
+    // internal func start
     def collectRow = collector.collect(projectedRow)
 
     def cacheRowDataAndRegisterTimer = {
@@ -178,8 +179,11 @@ class DataIntegrateKeyedCoProcessFunction(
       bulkDataProcessed.clear() // cuz no more used anymore
 
     def updateChangelogVersion = changelogVersion.update(currChangelogVersion)
+    //internal function end
+
     (lastVersionIsNull, bulkDataHasNotProcessed) match {
       case (true, true) =>
+        //the first data of this key ever.
         in2.getRowKind match {
           case RowKind.INSERT | RowKind.UPDATE_AFTER =>
             projectedRow.setRowKind(RowKind.INSERT)
