@@ -14,16 +14,24 @@ import com.neighborhood.aka.laplace.hackathon.util.VersionedUtil
 import org.apache.flink.streaming.api.watermark.Watermark
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord
 import org.apache.flink.streaming.util.KeyedTwoInputStreamOperatorTestHarness
-import org.apache.flink.table.api.{DataTypes, TableSchema}
-import org.apache.flink.table.data.{GenericRowData, RowData}
+import org.apache.flink.table.api.{DataTypes, TableConfig, TableSchema}
+import org.apache.flink.table.data.{GenericRowData, RawValueData, RowData}
+import org.apache.flink.table.planner.codegen.{
+  CodeGeneratorContext,
+  EqualiserCodeGenerator,
+  ProjectionCodeGenerator
+}
 import org.apache.flink.table.planner.plan.utils.KeySelectorUtil
+import org.apache.flink.table.runtime.generated.{Projection, RecordEqualiser}
 import org.apache.flink.table.runtime.typeutils.InternalTypeInfo
 import org.apache.flink.table.types.AtomicDataType
 import org.apache.flink.table.types.logical.{IntType, RowType}
 import org.apache.flink.table.utils.TableSchemaUtils
 import org.apache.flink.types.RowKind
-import org.junit.Assert.{assertEquals, assertTrue}
+import org.junit.Assert.{assertEquals, assertNull, assertTrue}
 import org.junit.{After, Before, Test}
+
+import scala.collection.JavaConversions._
 
 object DataIntegrateKeyedCoProcessFunctionTest {
 
@@ -41,6 +49,8 @@ object DataIntegrateKeyedCoProcessFunctionTest {
     tableSchema.toPhysicalRowDataType.getLogicalType.asInstanceOf[RowType]
   val changelogRowType =
     VersionedUtil.buildRowTypeWithVersioned(outputRowType, versionTypeSer)
+
+  val fixedDelay = 100
 
 }
 
@@ -61,6 +71,10 @@ class DataIntegrateKeyedCoProcessFunctionTest {
         RowData
       ] = _
 
+  private var changelogRecordEqualiser: RecordEqualiser = _
+
+  private var copyRowProjection: Projection[RowData, RowData] = _
+
   @Before
   def setup(): Unit = {
     harnessWithoutWatermarkAlign = createHarness(false)
@@ -68,6 +82,22 @@ class DataIntegrateKeyedCoProcessFunctionTest {
 
     harnessWithWatermarkAlign.open()
     harnessWithoutWatermarkAlign.open()
+
+    changelogRecordEqualiser =
+      new EqualiserCodeGenerator(changelogRowType.getChildren.toList.toArray)
+        .generateRecordEqualiser("DeduplicateRowEqualiser")
+        .newInstance(Thread.currentThread().getContextClassLoader)
+
+    copyRowProjection = ProjectionCodeGenerator
+      .generateProjection(
+        CodeGeneratorContext.apply(new TableConfig),
+        "CopyRowProjection",
+        changelogRowType,
+        outputRowType,
+        (0 until outputRowType.getFieldCount).toArray
+      )
+      .newInstance(Thread.currentThread.getContextClassLoader)
+      .asInstanceOf[Projection[RowData, RowData]]
   }
 
   @After
@@ -80,7 +110,7 @@ class DataIntegrateKeyedCoProcessFunctionTest {
 
   private def createHarness(sendDataBehindWatermark: Boolean) = {
     val function = new DataIntegrateKeyedCoProcessFunction(
-      fixedDelay = 10,
+      fixedDelay = fixedDelay,
       versionTypeSer = versionTypeSer,
       changelogInputRowType = changelogRowType,
       outputRowType = outputRowType,
@@ -108,24 +138,40 @@ class DataIntegrateKeyedCoProcessFunctionTest {
     )
   }
 
-  private def createStreamRecord(k: Int, v: Int, rowKind: RowKind) = {
+  private def createBulkStreamRecord(k: Int, v: Int) = {
     val rowData = new GenericRowData(2)
     rowData.setField(0, k)
     rowData.setField(1, v)
-    rowData.setRowKind(rowKind)
+    rowData.setRowKind(RowKind.INSERT)
+    new StreamRecord[RowData](rowData)
+  }
+
+  private def createChangelogStreamRecord(
+      k: Int,
+      v: Int,
+      rowKind: RowKind,
+      version: Versioned
+  ) = {
+    val rowData = new GenericRowData(3)
+    rowData.setField(0, k)
+    rowData.setField(1, v)
+    rowData.setField(2, RawValueData.fromObject(version))
+    rowData.setRowKind(RowKind.INSERT)
     new StreamRecord[RowData](rowData)
   }
 
   @Test
   def testBulkDataSendWhenWatermarkBeyondTimestamp(): Unit = {
 
-    val record = createStreamRecord(1, 1, RowKind.INSERT)
+    val record = createBulkStreamRecord(1, 1)
     harnessWithoutWatermarkAlign.processElement1(record)
     harnessWithWatermarkAlign.processElement1(record)
     assertTrue(harnessWithWatermarkAlign.getOutput.isEmpty)
     assertTrue(harnessWithoutWatermarkAlign.getOutput.isEmpty)
-    harnessWithoutWatermarkAlign.processWatermark2(new Watermark(100L))
-    harnessWithWatermarkAlign.processWatermark2(new Watermark(100L))
+    harnessWithoutWatermarkAlign.processWatermark2(
+      new Watermark(fixedDelay + 1)
+    )
+    harnessWithWatermarkAlign.processWatermark2(new Watermark(fixedDelay + 1))
     assertEquals(
       record.getValue,
       harnessWithWatermarkAlign.getOutput
@@ -142,4 +188,53 @@ class DataIntegrateKeyedCoProcessFunctionTest {
     )
   }
 
+  @Test
+  def testBulkDataSendWhenWatermarkEvictedByChangelogData(): Unit = {
+
+    val bulkData = createBulkStreamRecord(1, 1)
+    val changelogData1 = createChangelogStreamRecord(
+      1,
+      1,
+      RowKind.INSERT,
+      Versioned.of(fixedDelay - 1, fixedDelay - 1, false)
+    )
+    val changelogData2 = createChangelogStreamRecord(
+      1,
+      1,
+      RowKind.DELETE,
+      Versioned.of(fixedDelay + 1, fixedDelay + 1, false)
+    )
+
+    //non-aligned
+    harnessWithoutWatermarkAlign.processElement1(bulkData)
+    harnessWithoutWatermarkAlign.processElement2(changelogData1)
+    assertTrue(
+      changelogRecordEqualiser.equals(
+        copyRowProjection.apply(changelogData1.getValue),
+        harnessWithoutWatermarkAlign.getOutput
+          .poll()
+          .asInstanceOf[StreamRecord[RowData]]
+          .getValue
+      )
+    )
+    harnessWithoutWatermarkAlign.processElement2(changelogData2)
+    assertTrue(
+      changelogRecordEqualiser.equals(
+        copyRowProjection.apply(changelogData2.getValue),
+        harnessWithoutWatermarkAlign.getOutput
+          .poll()
+          .asInstanceOf[StreamRecord[RowData]]
+          .getValue
+      )
+    )
+
+    harnessWithoutWatermarkAlign.processWatermark2(
+      new Watermark(fixedDelay + 1)
+    )
+    assertEquals(
+      new Watermark(fixedDelay + 1),
+      harnessWithoutWatermarkAlign.getOutput.poll()
+    )
+    assertNull(harnessWithoutWatermarkAlign.getOutput.poll())
+  }
 }

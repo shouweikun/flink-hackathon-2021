@@ -1,8 +1,17 @@
 package com.neighborhood.aka.laplace.hackathon.version;
 
 import java.io.Serializable;
+import java.util.Objects;
 
 public final class Versioned implements Comparable<Versioned>, Serializable {
+
+    public static Versioned of(long generatedTs, long unifiedVersion, boolean isHeartbeat) {
+
+        Versioned versioned = new Versioned(isHeartbeat);
+        versioned.setUnifiedVersion(unifiedVersion);
+        versioned.setGeneratedTs(generatedTs);
+        return versioned;
+    }
 
     private long generatedTs;
 
@@ -53,5 +62,20 @@ public final class Versioned implements Comparable<Versioned>, Serializable {
                 + ", unifiedVersion="
                 + unifiedVersion
                 + '}';
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        Versioned versioned = (Versioned) o;
+        return generatedTs == versioned.generatedTs
+                && unifiedVersion == versioned.unifiedVersion
+                && isHeartbeat == versioned.isHeartbeat;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(generatedTs, unifiedVersion, isHeartbeat);
     }
 }
