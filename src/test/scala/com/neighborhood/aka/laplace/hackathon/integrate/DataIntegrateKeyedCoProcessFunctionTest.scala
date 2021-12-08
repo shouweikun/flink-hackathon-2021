@@ -156,7 +156,7 @@ class DataIntegrateKeyedCoProcessFunctionTest {
     rowData.setField(0, k)
     rowData.setField(1, v)
     rowData.setField(2, RawValueData.fromObject(version))
-    rowData.setRowKind(RowKind.INSERT)
+    rowData.setRowKind(rowKind)
     new StreamRecord[RowData](rowData)
   }
 
@@ -236,5 +236,87 @@ class DataIntegrateKeyedCoProcessFunctionTest {
       harnessWithoutWatermarkAlign.getOutput.poll()
     )
     assertNull(harnessWithoutWatermarkAlign.getOutput.poll())
+  }
+
+  @Test
+  def testFirstUpdateAfterChangelogDataWhenSendToDownStream(): Unit = {
+    val changelogData = createChangelogStreamRecord(
+      1,
+      1,
+      RowKind.UPDATE_AFTER,
+      Versioned.of(fixedDelay - 1, fixedDelay - 1, false)
+    )
+
+    harnessWithoutWatermarkAlign.processElement2(changelogData)
+    assertEquals(
+      RowKind.INSERT,
+      harnessWithoutWatermarkAlign.getOutput
+        .poll()
+        .asInstanceOf[StreamRecord[RowData]]
+        .getValue
+        .getRowKind
+    )
+
+    harnessWithWatermarkAlign.processElement2(changelogData)
+    assertTrue(harnessWithWatermarkAlign.getOutput.isEmpty)
+    harnessWithWatermarkAlign.processWatermark2(new Watermark(fixedDelay))
+    assertEquals(
+      RowKind.INSERT,
+      harnessWithWatermarkAlign.getOutput
+        .poll()
+        .asInstanceOf[StreamRecord[RowData]]
+        .getValue
+        .getRowKind
+    )
+    assertTrue(
+      harnessWithWatermarkAlign.getOutput.poll().isInstanceOf[Watermark]
+    )
+  }
+
+  @Test
+  def testFirstDeleteChangelogDataWhenSendToDownStream(): Unit = {
+    val changelogData = createChangelogStreamRecord(
+      1,
+      1,
+      RowKind.DELETE,
+      Versioned.of(fixedDelay - 1, fixedDelay - 1, false)
+    )
+
+    harnessWithoutWatermarkAlign.processElement2(changelogData)
+    assertTrue(harnessWithoutWatermarkAlign.getOutput.isEmpty)
+
+    harnessWithWatermarkAlign.processElement2(changelogData)
+    assertTrue(harnessWithWatermarkAlign.getOutput.isEmpty)
+    harnessWithWatermarkAlign.processWatermark2(new Watermark(fixedDelay))
+    assertTrue(
+      harnessWithWatermarkAlign.getOutput.poll().isInstanceOf[Watermark]
+    )
+    assertTrue(harnessWithWatermarkAlign.getOutput.isEmpty)
+  }
+
+  @Test
+  def testSwallowDuplicateSameVersionData(): Unit = {
+    val changelogData = createChangelogStreamRecord(
+      1,
+      1,
+      RowKind.INSERT,
+      Versioned.of(fixedDelay - 1, fixedDelay - 1, false)
+    )
+
+    harnessWithoutWatermarkAlign.processElement2(changelogData)
+    harnessWithoutWatermarkAlign.getOutput.clear()
+    (0 to 10).foreach(
+      _ => harnessWithoutWatermarkAlign.processElement2(changelogData)
+    )
+    assertTrue(harnessWithoutWatermarkAlign.getOutput.isEmpty)
+
+    harnessWithWatermarkAlign.processElement2(changelogData)
+    harnessWithWatermarkAlign.processWatermark2(new Watermark(fixedDelay))
+    harnessWithWatermarkAlign.getOutput.clear()
+    (0 to 10).foreach(
+      _ => harnessWithWatermarkAlign.processElement2(changelogData)
+    )
+    assertTrue(harnessWithWatermarkAlign.getOutput.isEmpty)
+
   }
 }
