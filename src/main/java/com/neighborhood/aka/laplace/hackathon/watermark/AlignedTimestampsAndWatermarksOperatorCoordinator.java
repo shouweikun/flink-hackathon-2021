@@ -16,6 +16,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.*;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 public class AlignedTimestampsAndWatermarksOperatorCoordinator
@@ -34,15 +35,17 @@ public class AlignedTimestampsAndWatermarksOperatorCoordinator
 
     private final int parallelism;
     private final OperatorID operatorID;
+    private final Consumer<Throwable> failHandler;
 
     private transient ExecutorService executorService;
     private transient OperatorCoordinator.SubtaskGateway[] subtaskGateways;
     private transient RuntimeContext context;
 
     public AlignedTimestampsAndWatermarksOperatorCoordinator(
-            int parallelism, OperatorID operatorID) {
+            int parallelism, OperatorID operatorID, Consumer<Throwable> failHandler) {
         this.parallelism = parallelism;
         this.operatorID = operatorID;
+        this.failHandler = failHandler;
     }
 
     @Override
@@ -73,7 +76,7 @@ public class AlignedTimestampsAndWatermarksOperatorCoordinator
             ReportLocalWatermark event = (ReportLocalWatermark) operatorEvent;
             putLocalWatermarkAndUpdateToAlign(event.getSubtask(), event.getLocalTs());
             Long globalWatermark = getGlobalWatermark();
-            subtaskGateways[subTaskId].sendEvent(new ReportLocalWatermarkAck(globalWatermark));
+            sendEvent(subtaskGateways[subTaskId], new ReportLocalWatermarkAck(globalWatermark));
         } else if (operatorEvent instanceof WatermarkAlignAck) {
             WatermarkAlignAck event = (WatermarkAlignAck) operatorEvent;
             putLocalWatermarkAndUpdateToAlign(event.getSubtask(), event.getLocalTs());
@@ -162,6 +165,18 @@ public class AlignedTimestampsAndWatermarksOperatorCoordinator
     @Override
     public void subtaskReady(int subTaskId, SubtaskGateway subtaskGateway) {
         subtaskGateways[subTaskId] = subtaskGateway;
+    }
+
+    private void sendEvent(SubtaskGateway gateway, OperatorEvent event) {
+        gateway.sendEvent(event)
+                .handleAsync(
+                        (f, e) -> {
+                            if (e != null) {
+                                failHandler.accept(e);
+                            }
+                            return null;
+                        },
+                        executorService);
     }
 
     private void putLocalWatermarkAndUpdateToAlign(Integer subtaskId, Long localWatermark) {

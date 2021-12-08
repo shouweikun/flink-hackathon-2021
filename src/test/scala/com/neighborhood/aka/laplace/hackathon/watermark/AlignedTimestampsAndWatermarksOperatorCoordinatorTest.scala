@@ -17,6 +17,7 @@ import java.util.concurrent.{
   TimeUnit,
   TimeoutException
 }
+import java.util.function.Consumer
 
 object AlignedTimestampsAndWatermarksOperatorCoordinatorTest {}
 
@@ -67,7 +68,10 @@ class AlignedTimestampsAndWatermarksOperatorCoordinatorTest {
   def getNewCoordinator = {
     new AlignedTimestampsAndWatermarksOperatorCoordinator(
       NUM_SUBTASKS,
-      operatorName
+      operatorName,
+      new Consumer[Throwable] {
+        override def accept(t: Throwable): Unit = {}
+      }
     )
   }
 

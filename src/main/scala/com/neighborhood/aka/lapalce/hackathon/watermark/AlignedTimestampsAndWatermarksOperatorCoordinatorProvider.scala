@@ -5,6 +5,8 @@ import com.neighborhood.aka.laplace.hackathon.watermark.AlignedTimestampsAndWate
 import org.apache.flink.runtime.jobgraph.OperatorID
 import org.apache.flink.runtime.operators.coordination.OperatorCoordinator
 
+import java.util.function.Consumer
+
 class AlignedTimestampsAndWatermarksOperatorCoordinatorProvider(
     final val operatorId: OperatorID
 ) extends OperatorCoordinator.Provider {
@@ -17,7 +19,10 @@ class AlignedTimestampsAndWatermarksOperatorCoordinatorProvider(
     val parallelism = context.currentParallelism()
     new AlignedTimestampsAndWatermarksOperatorCoordinator(
       parallelism,
-      getOperatorId
+      getOperatorId,
+      new Consumer[Throwable] {
+        override def accept(t: Throwable): Unit = context.failJob(t)
+      }
     )
   }
 }
