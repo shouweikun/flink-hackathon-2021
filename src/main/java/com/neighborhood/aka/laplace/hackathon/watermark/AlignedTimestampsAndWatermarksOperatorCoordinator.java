@@ -33,6 +33,7 @@ public class AlignedTimestampsAndWatermarksOperatorCoordinator
     private final Consumer<Throwable> failHandler;
 
     private transient ExecutorService executorService;
+    private transient ExecutorService messageDeliveryCheckExecutorService;
     private transient OperatorCoordinator.SubtaskGateway[] subtaskGateways;
     private transient RuntimeContext context;
     private transient volatile CountDownLatch alignCountDownLatch;
@@ -55,6 +56,12 @@ public class AlignedTimestampsAndWatermarksOperatorCoordinator
                 Executors.newSingleThreadExecutor(
                         new ExecutorThreadFactory(
                                 "AlignedTimestampsAndWatermarksOperatorCoordinator-" + operatorID));
+
+        messageDeliveryCheckExecutorService =
+                Executors.newSingleThreadExecutor(
+                        new ExecutorThreadFactory(
+                                "AlignedTimestampsAndWatermarksOperatorCoordinator-messageCheck-"
+                                        + operatorID));
     }
 
     @Override
@@ -161,7 +168,7 @@ public class AlignedTimestampsAndWatermarksOperatorCoordinator
                             }
                             return null;
                         },
-                        executorService);
+                        messageDeliveryCheckExecutorService);
     }
 
     private void putLocalWatermarkAndUpdateToAlign(Integer subtaskId, Long localWatermark) {
