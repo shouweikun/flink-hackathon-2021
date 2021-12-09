@@ -2,7 +2,6 @@ package com.neighborhood.aka.laplace.hackathon.watermark;
 
 import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.runtime.jobgraph.OperatorID;
-import org.apache.flink.runtime.messages.Acknowledge;
 import org.apache.flink.runtime.operators.coordination.OperatorCoordinator;
 import org.apache.flink.runtime.operators.coordination.OperatorEvent;
 import org.apache.flink.runtime.util.ExecutorThreadFactory;
@@ -17,19 +16,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.*;
 import java.util.function.Consumer;
-import java.util.stream.Collectors;
 
 public class AlignedTimestampsAndWatermarksOperatorCoordinator
         implements OperatorCoordinator, WatermarkAlignMember {
 
     static class RuntimeContext implements Serializable {
         final Map<Integer, Long> subtaskIdAndLocalWatermark;
-        final Map<Integer, Boolean> ackedSubtask;
 
         public RuntimeContext() {
             this.subtaskIdAndLocalWatermark = new HashMap<>();
-            ;
-            this.ackedSubtask = new ConcurrentHashMap<>();
         }
     }
 
@@ -40,6 +35,7 @@ public class AlignedTimestampsAndWatermarksOperatorCoordinator
     private transient ExecutorService executorService;
     private transient OperatorCoordinator.SubtaskGateway[] subtaskGateways;
     private transient RuntimeContext context;
+    private transient volatile CountDownLatch alignCountDownLatch;
 
     public AlignedTimestampsAndWatermarksOperatorCoordinator(
             int parallelism, OperatorID operatorID, Consumer<Throwable> failHandler) {
@@ -80,7 +76,7 @@ public class AlignedTimestampsAndWatermarksOperatorCoordinator
         } else if (operatorEvent instanceof WatermarkAlignAck) {
             WatermarkAlignAck event = (WatermarkAlignAck) operatorEvent;
             putLocalWatermarkAndUpdateToAlign(event.getSubtask(), event.getLocalTs());
-            addAckedSubtask(event.getSubtask());
+            alignCountDownLatch.countDown();
         }
     }
 
@@ -88,55 +84,42 @@ public class AlignedTimestampsAndWatermarksOperatorCoordinator
     public void checkpointCoordinator(long checkpointId, CompletableFuture<byte[]> result)
             throws Exception {
 
-        CompletableFuture<List<SubtaskGateway>> sendResult = new CompletableFuture<>();
-
+        this.checkpointCoordinatorOnAlignment(checkpointId);
         final Long globalWatermark = getGlobalWatermark();
-        final Map<Integer, Boolean> ackedSubtask = context.ackedSubtask;
         final ImmutableList<SubtaskGateway> gatewayList = ImmutableList.copyOf(subtaskGateways);
         final RuntimeContext runtimeContext = this.context;
+        final CountDownLatch countDownLatch = new CountDownLatch(parallelism);
+        this.alignCountDownLatch = countDownLatch;
 
-        sendResult.handleAsync(
-                (list, ex) -> {
-                    List<CompletableFuture<Acknowledge>> ackList =
-                            list.stream()
-                                    .map(
-                                            gateway ->
-                                                    gateway.sendEvent(
-                                                            new WatermarkAlignRequest(
-                                                                    globalWatermark)))
-                                    .collect(Collectors.toList());
+        final WatermarkAlignRequest event = new WatermarkAlignRequest(globalWatermark);
 
-                    try {
-                        for (int index = 0; index < list.size(); index++) {
-                            ackList.get(index).get();
-                            int count = 0;
-                            while (true) {
-                                if (ackedSubtask.containsKey(index)) {
-                                    break;
-                                } else {
-                                    if (count > 30) {
-                                        result.completeExceptionally(new TimeoutException());
-                                        return null;
-                                    }
-                                    count++;
-                                    Thread.sleep(200);
-                                }
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        ObjectOutputStream oos = new ObjectOutputStream(baos);
+        oos.writeObject(runtimeContext);
+        final byte[] bytes = baos.toByteArray();
+        CompletableFuture<List<SubtaskGateway>> sendResult = new CompletableFuture<>();
+
+        sendResult
+                .handleAsync(
+                        (list, ex) -> {
+                            list.stream().forEach(gateway -> sendEvent(gateway, event));
+                            return null;
+                        },
+                        executorService)
+                .handleAsync(
+                        (r, ex) -> {
+                            try {
+                                countDownLatch.await(60, TimeUnit.SECONDS);
+                                result.complete(bytes);
+                                return null;
+
+                            } catch (Exception e) {
+                                result.completeExceptionally(e);
+                                return null;
                             }
-                        }
-                        runtimeContext.ackedSubtask.clear();
-                        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                        ObjectOutputStream oos = new ObjectOutputStream(baos);
-                        oos.writeObject(runtimeContext);
-                        result.complete(baos.toByteArray());
-                        return null;
-                    } catch (Exception e) {
-                        result.completeExceptionally(e);
-                        return null;
-                    }
-                },
-                executorService);
+                        },
+                        executorService);
 
-        this.checkpointCoordinatorOnAlignment(checkpointId);
         sendResult.complete(gatewayList);
     }
 
@@ -154,6 +137,8 @@ public class AlignedTimestampsAndWatermarksOperatorCoordinator
             ObjectInputStream ois = new ObjectInputStream(bais);
             context = (RuntimeContext) ois.readObject();
         }
+
+        updateOperatorTs();
     }
 
     @Override
@@ -186,7 +171,10 @@ public class AlignedTimestampsAndWatermarksOperatorCoordinator
         } else if (subtaskIdAndLocalWatermark.get(subtaskId) < localWatermark) {
             subtaskIdAndLocalWatermark.put(subtaskId, localWatermark);
         }
+        updateOperatorTs();
+    }
 
+    private void updateOperatorTs() {
         putOperatorTs(operatorID, computeOperatorTs());
     }
 
@@ -204,10 +192,6 @@ public class AlignedTimestampsAndWatermarksOperatorCoordinator
 
     Long getGlobalWatermark() {
         return this.getGlobalAlignedWatermarkTs();
-    }
-
-    private void addAckedSubtask(Integer subtaskId) {
-        this.context.ackedSubtask.put(subtaskId, true);
     }
 
     @VisibleForTesting
