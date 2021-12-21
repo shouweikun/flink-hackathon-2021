@@ -12,6 +12,7 @@ import org.junit.{After, Before, Test}
 
 import java.util.concurrent.{
   CompletableFuture,
+  CountDownLatch,
   ExecutorService,
   Executors,
   TimeUnit,
@@ -127,14 +128,16 @@ class AlignedTimestampsAndWatermarksOperatorCoordinatorTest {
     assertEquals(coordinator.computeOperatorTs(), ts)
     assertEquals(coordinator.getGlobalWatermark, ts - 1)
 
+    coordinator.alignCountDownLatch = new CountDownLatch(NUM_SUBTASKS)
     (0 until NUM_SUBTASKS) foreach {
       case index =>
         coordinator.handleEventFromOperator(
           index,
           new WatermarkAlignAck(index, ts)
         )
-        assertTrue(
-          coordinator.getRuntimeContext.ackedSubtask.containsKey(index)
+        assertEquals(
+          NUM_SUBTASKS - index - 1,
+          coordinator.alignCountDownLatch.getCount
         )
     }
 

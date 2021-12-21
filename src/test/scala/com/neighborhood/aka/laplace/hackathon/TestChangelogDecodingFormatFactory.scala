@@ -33,10 +33,7 @@ class TestChangelogDecodingFormatFactory extends DeserializationFormatFactory {
           dataType: DataType
       ): DeserializationSchema[RowData] = {
         new TestChangelogDeserializationSchema(
-          dataType.getLogicalType.asInstanceOf[RowType],
-          TypeInformation
-            .of(classOf[Versioned])
-            .createSerializer(new ExecutionConfig)
+          dataType.getLogicalType.asInstanceOf[RowType]
         )
       }
 
