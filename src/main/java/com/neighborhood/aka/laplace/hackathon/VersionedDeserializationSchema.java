@@ -1,6 +1,5 @@
 package com.neighborhood.aka.laplace.hackathon;
 
-import org.apache.flink.api.common.ExecutionConfig;
 import org.apache.flink.api.common.serialization.DeserializationSchema;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
@@ -18,7 +17,7 @@ public interface VersionedDeserializationSchema extends DeserializationSchema<Ro
     RowType getRowDataType();
 
     default TypeSerializer<Versioned> getVersionTypeSerializer() {
-        return TypeInformation.of(Versioned.class).createSerializer(new ExecutionConfig());
+        return VersionedUtil.DEFAULT_TYPE_SER;
     }
 
     @Override

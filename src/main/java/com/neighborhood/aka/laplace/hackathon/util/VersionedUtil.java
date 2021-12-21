@@ -1,5 +1,7 @@
 package com.neighborhood.aka.laplace.hackathon.util;
 
+import org.apache.flink.api.common.ExecutionConfig;
+import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.table.types.logical.RawType;
@@ -23,4 +25,7 @@ public class VersionedUtil {
         types.add(new RawType(Versioned.class, ser));
         return RowType.of(types.toArray(new LogicalType[0]));
     }
+
+    public static TypeSerializer<Versioned> DEFAULT_TYPE_SER =
+            TypeInformation.of(Versioned.class).createSerializer(new ExecutionConfig());
 }

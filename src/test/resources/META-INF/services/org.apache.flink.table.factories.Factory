@@ -4,3 +4,4 @@ com.neighborhood.aka.laplace.hackathon.DummyValueTableFactory
 com.neighborhood.aka.lapalce.hackathon.UnifiedTableFactory
 com.neighborhood.aka.laplace.hackathon.TestBulkDecodingFormatFactory
 com.neighborhood.aka.laplace.hackathon.TestChangelogDecodingFormatFactory
+com.neighborhood.aka.laplace.hackathon.formats.estuary.EstuaryTestDeserializationFormatFactory

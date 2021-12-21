@@ -15,11 +15,9 @@ import scala.collection.JavaConversions._
 import scala.util.Try
 
 class TestChangelogDeserializationSchema(
-    val rowType: RowType,
-    val versionTypeSerializer: TypeSerializer[Versioned]
+    val rowType: RowType
 ) extends AbstractVersionedDeserializationSchema(
-      rowType,
-      versionTypeSerializer
+      rowType
     ) {
 
   private var data: List[(String, Int, Int, Long)] = _
