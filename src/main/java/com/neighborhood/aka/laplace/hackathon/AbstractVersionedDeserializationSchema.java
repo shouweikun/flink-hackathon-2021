@@ -1,6 +1,5 @@
 package com.neighborhood.aka.laplace.hackathon;
 
-import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.table.data.GenericRowData;
 import org.apache.flink.table.data.RawValueData;
@@ -19,22 +18,14 @@ public abstract class AbstractVersionedDeserializationSchema
         implements VersionedDeserializationSchema {
 
     private final RowType rowType;
-    private final TypeSerializer<Versioned> versionTypeSerializer;
 
-    public AbstractVersionedDeserializationSchema(
-            RowType rowType, TypeSerializer<Versioned> versionTypeSerializer) {
+    public AbstractVersionedDeserializationSchema(RowType rowType) {
         this.rowType = rowType;
-        this.versionTypeSerializer = versionTypeSerializer;
     }
 
     @Override
     public RowType getRowDataType() {
         return this.rowType;
-    }
-
-    @Override
-    public TypeSerializer<Versioned> getVersionTypeSerializer() {
-        return this.versionTypeSerializer;
     }
 
     @Override
@@ -49,5 +40,6 @@ public abstract class AbstractVersionedDeserializationSchema
         }
     }
 
-    protected abstract Collection<Tuple2<RowData, Versioned>> deserializeInternal(byte[] bytes);
+    protected abstract Collection<Tuple2<RowData, Versioned>> deserializeInternal(byte[] bytes)
+            throws IOException;
 }

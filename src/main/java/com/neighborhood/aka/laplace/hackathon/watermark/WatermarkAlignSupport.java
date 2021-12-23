@@ -3,6 +3,9 @@ package com.neighborhood.aka.laplace.hackathon.watermark;
 import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -69,6 +72,8 @@ public class WatermarkAlignSupport {
         }
     }
 
+    private static final Logger logger = LoggerFactory.getLogger(WatermarkAlignSupport.class);
+
     private WatermarkAlignSupport() {}
 
     @VisibleForTesting static CheckpointIdAndAlignTs currentCheckpointIdAndAlignTs = null;
@@ -87,7 +92,13 @@ public class WatermarkAlignSupport {
         if (currentCheckpointIdAndAlignTs == null
                 || currentCheckpointIdAndAlignTs.checkpointId < checkpointId) {
             currentCheckpointIdAndAlignTs = null;
-            currentCheckpointIdAndAlignTs = new CheckpointIdAndAlignTs(getGlobalTs(), checkpointId);
+            Long globalTs = getGlobalTs();
+            currentCheckpointIdAndAlignTs = new CheckpointIdAndAlignTs(globalTs, checkpointId);
+            logger.info(
+                    "WarkmarkAlignSupport process checkpointCoordinator:"
+                            + checkpointId
+                            + "global ts:"
+                            + globalTs);
             return true;
         } else {
             return false;

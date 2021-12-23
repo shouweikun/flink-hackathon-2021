@@ -2,24 +2,19 @@
 package com.neighborhood.aka.laplace.hackathon
 
 import com.neighborhood.aka.laplace.hackathon.version.Versioned
-import org.apache.flink.api.common.serialization.DeserializationSchema
-import org.apache.flink.api.common.typeutils.TypeSerializer
 import org.apache.flink.api.java.tuple
 import org.apache.flink.table.data.{GenericRowData, RowData}
 import org.apache.flink.table.types.logical.RowType
 import org.apache.flink.types.RowKind
 
-import java.util
 import java.util.Collections
 import scala.collection.JavaConversions._
 import scala.util.Try
 
 class TestChangelogDeserializationSchema(
-    val rowType: RowType,
-    val versionTypeSerializer: TypeSerializer[Versioned]
+    val rowType: RowType
 ) extends AbstractVersionedDeserializationSchema(
-      rowType,
-      versionTypeSerializer
+      rowType
     ) {
 
   private var data: List[(String, Int, Int, Long)] = _

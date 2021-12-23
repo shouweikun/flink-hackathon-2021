@@ -8,6 +8,9 @@ import org.apache.flink.runtime.util.ExecutorThreadFactory;
 
 import org.apache.flink.shaded.guava18.com.google.common.collect.ImmutableList;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import javax.annotation.Nullable;
 
 import java.io.*;
@@ -28,14 +31,18 @@ public class AlignedTimestampsAndWatermarksOperatorCoordinator
         }
     }
 
+    private static final Logger logger =
+            LoggerFactory.getLogger(AlignedTimestampsAndWatermarksOperatorCoordinator.class);
+
     private final int parallelism;
     private final OperatorID operatorID;
     private final Consumer<Throwable> failHandler;
 
     private transient ExecutorService executorService;
+    private transient ExecutorService messageDeliveryCheckExecutorService;
     private transient OperatorCoordinator.SubtaskGateway[] subtaskGateways;
     private transient RuntimeContext context;
-    private transient volatile CountDownLatch alignCountDownLatch;
+    @VisibleForTesting public transient volatile CountDownLatch alignCountDownLatch;
 
     public AlignedTimestampsAndWatermarksOperatorCoordinator(
             int parallelism, OperatorID operatorID, Consumer<Throwable> failHandler) {
@@ -55,6 +62,12 @@ public class AlignedTimestampsAndWatermarksOperatorCoordinator
                 Executors.newSingleThreadExecutor(
                         new ExecutorThreadFactory(
                                 "AlignedTimestampsAndWatermarksOperatorCoordinator-" + operatorID));
+
+        messageDeliveryCheckExecutorService =
+                Executors.newSingleThreadExecutor(
+                        new ExecutorThreadFactory(
+                                "AlignedTimestampsAndWatermarksOperatorCoordinator-messageCheck-"
+                                        + operatorID));
     }
 
     @Override
@@ -83,7 +96,7 @@ public class AlignedTimestampsAndWatermarksOperatorCoordinator
     @Override
     public void checkpointCoordinator(long checkpointId, CompletableFuture<byte[]> result)
             throws Exception {
-
+        logger.info(operatorID + " processing checkpointCoordinator, checkpointId:" + checkpointId);
         this.checkpointCoordinatorOnAlignment(checkpointId);
         final Long globalWatermark = getGlobalWatermark();
         final ImmutableList<SubtaskGateway> gatewayList = ImmutableList.copyOf(subtaskGateways);
@@ -161,7 +174,7 @@ public class AlignedTimestampsAndWatermarksOperatorCoordinator
                             }
                             return null;
                         },
-                        executorService);
+                        messageDeliveryCheckExecutorService);
     }
 
     private void putLocalWatermarkAndUpdateToAlign(Integer subtaskId, Long localWatermark) {
