@@ -34,7 +34,8 @@ class UnifiedTableSource(
     private val fixedDelay: Long,
     private val bulkParallelism: Option[Int],
     private val changelogParallelism: Int,
-    private val watermarkAlign: Boolean
+    private val watermarkAlign: Boolean,
+    private val disableBulk: Boolean
 ) extends ScanTableSource {
 
   private[source] class UnifiedDataStreamScanProvider(
@@ -51,11 +52,19 @@ class UnifiedTableSource(
         streamExecutionEnvironment: StreamExecutionEnvironment
     ): DataStream[RowData] = {
 
-      val bulkSource = createSource(
-        streamExecutionEnvironment,
-        bulkSourceProvider,
-        Option(outputTypeInformation)
-      )
+      val bulkSource = if (disableBulk) {
+        val source =
+          streamExecutionEnvironment.addSource(new DummySourceFunction[RowData])
+        source.getTransformation.setOutputType(outputTypeInformation)
+        source
+      } else {
+        createSource(
+          streamExecutionEnvironment,
+          bulkSourceProvider,
+          Option(outputTypeInformation)
+        )
+      }
+
       val realtimeChangelogSource = createSource(
         streamExecutionEnvironment,
         realtimeChangelogSourceProvider,
@@ -212,7 +221,8 @@ class UnifiedTableSource(
     fixedDelay,
     bulkParallelism,
     changelogParallelism,
-    watermarkAlign
+    watermarkAlign,
+    disableBulk
   )
 
   override def asSummaryString(): String = "unified source"

@@ -5,6 +5,7 @@ import com.neighborhood.aka.lapalce.hackathon.UnifiedTableFactory.{
   BULK_PARAL,
   CHANGELOG_PARAL,
   CHANGELOG_PREFIX,
+  DISABLE_BULK,
   FIXED_DELAY,
   InternalContext,
   WATERMARK_ALIGN,
@@ -92,6 +93,7 @@ class UnifiedTableFactory extends DynamicTableSourceFactory {
     ).map(_.intValue())
     val changelogParallelism = helper.getOptions.get(CHANGELOG_PARAL).intValue()
     val watermarkAlign = helper.getOptions.get(WATERMARK_ALIGN).booleanValue()
+    val disableBulk = helper.getOptions.get(DISABLE_BULK).booleanValue()
 
     new UnifiedTableSource(
       bulkTableSource.asInstanceOf[ScanTableSource],
@@ -102,7 +104,8 @@ class UnifiedTableFactory extends DynamicTableSourceFactory {
       fixedDelay,
       bulkParallelism,
       changelogParallelism,
-      watermarkAlign
+      watermarkAlign,
+      disableBulk
     )
   }
 
@@ -116,7 +119,8 @@ class UnifiedTableFactory extends DynamicTableSourceFactory {
   override def optionalOptions(): util.Set[ConfigOption[_]] =
     Set[ConfigOption[_]](
       FIXED_DELAY,
-      BULK_PARAL
+      BULK_PARAL,
+      DISABLE_BULK
     )
 }
 
@@ -183,6 +187,12 @@ object UnifiedTableFactory {
 
   val WATERMARK_ALIGN: ConfigOption[JBoolean] = ConfigOptions
     .key("using-watermark-align")
+    .booleanType()
+    .defaultValue(false)
+    .withDescription("")
+
+  val DISABLE_BULK: ConfigOption[JBoolean] = ConfigOptions
+    .key("disable-bulk")
     .booleanType()
     .defaultValue(false)
     .withDescription("")
