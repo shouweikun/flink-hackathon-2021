@@ -38,7 +38,8 @@ class DataIntegrateKeyedCoProcessFunction(
     private val outputRowType: RowType,
     private val outputTypeInformation: TypeInformation[RowData],
     private val versionTypeInformation: TypeInformation[Versioned],
-    private val sendDataBehindWatermark: Boolean = false
+    private val sendDataBehindWatermark: Boolean = false,
+    private val isDebug: Boolean = false
 ) extends KeyedCoProcessFunction[RowData, RowData, RowData, RowData] {
 
   private final val logger =
@@ -110,7 +111,12 @@ class DataIntegrateKeyedCoProcessFunction(
       ctx: KeyedCoProcessFunction[RowData, RowData, RowData, RowData]#OnTimerContext,
       out: Collector[RowData]
   ): Unit = {
-
+    def collectRow(rowData: RowData): Unit = {
+      logger.info(
+        s"collect row at:$timestamp, watermark:${ctx.timerService().currentWatermark()}"
+      )
+      out.collect(rowData)
+    }
     //start part of changelog data
     val data = registeredChangelogData.get(timestamp)
     val hasChangelogData = data != null && !data.isEmpty
@@ -118,7 +124,7 @@ class DataIntegrateKeyedCoProcessFunction(
       val iter = data.iterator()
       while (iter.hasNext) {
         val curr = iter.next()
-        out.collect(curr)
+        collectRow(curr)
       }
       registeredChangelogData.remove(timestamp)
     }
@@ -127,7 +133,7 @@ class DataIntegrateKeyedCoProcessFunction(
     // start part of bulk data
     if (registeredTime.value() != null) {
       if (!hasChangelogData && getLastChangelogVersion() == null) {
-        out.collect(getBulkData())
+        collectRow(getBulkData())
         bulkDataProcessed.update(true)
       }
       bulkData.clear()

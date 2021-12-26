@@ -48,8 +48,13 @@ class UnifiedTableFactory extends DynamicTableSourceFactory {
     val options = catalogTable.getOptions
     val bulkOptions = getBulkOptions(options)
     val changelogOptions = getRealtimeChangeOptions(options)
+    val helper = FactoryUtil.createTableFactoryHelper(this, context)
 
-    val bulkTableSource = {
+    val disableBulk = helper.getOptions.get(DISABLE_BULK).booleanValue()
+
+    val bulkTableSource = if (disableBulk) {
+      null
+    } else {
       val bulkTable = catalogTable.copy(bulkOptions)
       FactoryUtil.createTableSource(
         null,
@@ -60,6 +65,9 @@ class UnifiedTableFactory extends DynamicTableSourceFactory {
         context.isTemporary
       )
     }
+
+    val bulkTableSourceOption = Option(bulkTableSource)
+
     val (realtimeChangelogSource, changelogFormat) = {
       val changelogTable = catalogTable.copy(changelogOptions)
       val source = FactoryUtil.createTableSource(
@@ -83,20 +91,20 @@ class UnifiedTableFactory extends DynamicTableSourceFactory {
       (source, format)
     }
 
-    assert(bulkTableSource.isInstanceOf[ScanTableSource])
+    assert(
+      bulkTableSourceOption.map(_.isInstanceOf[ScanTableSource]).getOrElse(true)
+    )
     assert(realtimeChangelogSource.isInstanceOf[ScanTableSource])
 
-    val helper = FactoryUtil.createTableFactoryHelper(this, context)
     val fixedDelay = helper.getOptions.get(FIXED_DELAY).longValue()
     val bulkParallelism = Option(
       helper.getOptions.getOptional(BULK_PARAL).orElse(null)
     ).map(_.intValue())
     val changelogParallelism = helper.getOptions.get(CHANGELOG_PARAL).intValue()
     val watermarkAlign = helper.getOptions.get(WATERMARK_ALIGN).booleanValue()
-    val disableBulk = helper.getOptions.get(DISABLE_BULK).booleanValue()
 
     new UnifiedTableSource(
-      bulkTableSource.asInstanceOf[ScanTableSource],
+      bulkTableSourceOption.map(_.asInstanceOf[ScanTableSource]).orNull,
       realtimeChangelogSource.asInstanceOf[ScanTableSource],
       catalogTable.getSchema,
       changelogFormat

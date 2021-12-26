@@ -138,6 +138,7 @@ public class AlignedTimestampsAndWatermarksOperatorCoordinator
 
     @Override
     public void notifyCheckpointComplete(long checkpointId) {
+        logger.info("process notifyCheckpointComplete: " + checkpointId + "operator:" + operatorID);
         this.notifyCheckpointCompleteOnAlignment(checkpointId);
     }
 

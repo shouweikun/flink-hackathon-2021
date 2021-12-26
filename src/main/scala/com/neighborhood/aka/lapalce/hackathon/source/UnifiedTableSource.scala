@@ -26,8 +26,10 @@ import org.apache.flink.table.types.logical.RowType
 import org.apache.flink.table.utils.TableSchemaUtils
 import org.apache.flink.types.RowKind
 
+import javax.annotation.Nullable
+
 class UnifiedTableSource(
-    private val bulkSource: ScanTableSource,
+    @Nullable private val bulkSource: ScanTableSource,
     private val realtimeChangelogSource: ScanTableSource,
     private val tableSchema: TableSchema,
     private val decodingFormat: DecodingFormat[VersionedDeserializationSchema],
@@ -39,7 +41,7 @@ class UnifiedTableSource(
 ) extends ScanTableSource {
 
   private[source] class UnifiedDataStreamScanProvider(
-      bulkSourceProvider: ScanTableSource.ScanRuntimeProvider,
+      @Nullable bulkSourceProvider: ScanTableSource.ScanRuntimeProvider,
       realtimeChangelogSourceProvider: ScanTableSource.ScanRuntimeProvider,
       fixedDelay: Long,
       versionTypeSer: TypeSerializer[Versioned],
@@ -139,10 +141,13 @@ class UnifiedTableSource(
       }
 
       val heartbeatFilter = watermarked.filter(new FilterFunction[RowData] {
+
+        final val typeSer = versionTypeSer
+
         override def filter(value: RowData): Boolean = {
           !value
-            .getRawValue(value.getArity)
-            .toObject(versionTypeSer)
+            .getRawValue(value.getArity - 1)
+            .toObject(typeSer)
             .isHeartbeat
         }
       })
@@ -202,7 +207,7 @@ class UnifiedTableSource(
     val outputRowType = dataType.getLogicalType.asInstanceOf[RowType]
 
     new UnifiedDataStreamScanProvider(
-      bulkSource.getScanRuntimeProvider(scanContext),
+      Option(bulkSource).map(_.getScanRuntimeProvider(scanContext)).orNull,
       realtimeChangelogSource.getScanRuntimeProvider(scanContext),
       fixedDelay,
       versionTypeSer,

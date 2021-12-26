@@ -63,7 +63,7 @@ public class EstuaryTestDeserializationSchema extends AbstractVersionedDeseriali
 
     private final String tsFieldName;
 
-    private final RowData dummyRow;
+    private RowData dummyRow;
 
     public EstuaryTestDeserializationSchema(
             RowType rowType,
@@ -98,7 +98,11 @@ public class EstuaryTestDeserializationSchema extends AbstractVersionedDeseriali
         } else {
             throw new IllegalArgumentException();
         }
-        this.dummyRow = new GenericRowData(rowType.getFieldCount());
+    }
+
+    @Override
+    public void open(InitializationContext context) throws Exception {
+        this.dummyRow = new GenericRowData(getRowDataType().getFieldCount());
     }
 
     public Collection<Tuple2<RowData, Versioned>> deserializeInternal(@Nullable byte[] message)
