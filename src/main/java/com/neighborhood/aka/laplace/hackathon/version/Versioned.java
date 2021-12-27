@@ -3,6 +3,7 @@ package com.neighborhood.aka.laplace.hackathon.version;
 import java.io.Serializable;
 import java.util.Arrays;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 public final class Versioned implements Comparable<Versioned>, Serializable {
 
@@ -74,7 +75,9 @@ public final class Versioned implements Comparable<Versioned>, Serializable {
                 + "generatedTs="
                 + generatedTs
                 + ", unifiedVersion="
-                + Arrays.asList(unifiedVersion)
+                + Arrays.asList(unifiedVersion).stream()
+                        .map(String::valueOf)
+                        .collect(Collectors.joining(","))
                 + '}';
     }
 

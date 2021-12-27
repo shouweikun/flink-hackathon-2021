@@ -9,6 +9,8 @@ import org.apache.flink.table.types.logical.DecimalType;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.table.types.logical.utils.LogicalTypeChecks;
 
+import org.apache.flink.shaded.guava18.com.google.common.cache.Cache;
+import org.apache.flink.shaded.guava18.com.google.common.cache.CacheBuilder;
 import org.apache.flink.shaded.guava18.com.google.common.collect.ImmutableList;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.core.json.JsonReadFeature;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.DeserializationFeature;
@@ -114,6 +116,22 @@ public class EstuaryTestDeserializationSchema extends AbstractVersionedDeseriali
                         long offset = binlog.get("offset").asLong();
                         long file = Long.valueOf(binlog.get("file").asText().split("\\.")[1]);
                         return new long[] {file, offset, 0};
+                    };
+        } else if (dbType.equals("sqlserver")) {
+            versionExtractFunction =
+                    jsonNode -> {
+                        final Cache<Long, Long> tsCounterCache =
+                                CacheBuilder.newBuilder().maximumSize(5).build();
+                        final String tsFieldName = this.tsFieldName;
+                        long ts = jsonNode.get(tsFieldName).asLong();
+                        Long count = tsCounterCache.getIfPresent(ts);
+                        if (count == null) {
+                            count = 0L;
+                        } else {
+                            count++;
+                        }
+                        tsCounterCache.put(ts, count);
+                        return new long[] {ts, count, 0};
                     };
         } else {
             versionExtractFunction =
