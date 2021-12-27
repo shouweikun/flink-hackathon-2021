@@ -6,6 +6,7 @@ import org.apache.flink.runtime.operators.coordination.OperatorCoordinator;
 import org.apache.flink.runtime.operators.coordination.OperatorEventDispatcher;
 import org.apache.flink.streaming.api.operators.*;
 import org.apache.flink.streaming.runtime.tasks.ProcessingTimeServiceAware;
+import org.apache.flink.table.catalog.ObjectPath;
 
 import com.neighborhood.aka.lapalce.hackathon.watermark.AlignedTimestampsAndWatermarksOperatorCoordinatorProvider;
 
@@ -16,9 +17,12 @@ public class AlignedTimestampsAndWatermarksOperatorFactory<IN, OUT>
                 ProcessingTimeServiceAware {
 
     private final WatermarkStrategy<OUT> watermarkStrategy;
+    private final ObjectPath tableName;
 
-    public AlignedTimestampsAndWatermarksOperatorFactory(WatermarkStrategy<OUT> watermarkStrategy) {
+    public AlignedTimestampsAndWatermarksOperatorFactory(
+            WatermarkStrategy<OUT> watermarkStrategy, ObjectPath tableName) {
         this.watermarkStrategy = watermarkStrategy;
+        this.tableName = tableName;
     }
 
     @Override
@@ -30,7 +34,7 @@ public class AlignedTimestampsAndWatermarksOperatorFactory<IN, OUT>
     public <T extends StreamOperator<OUT>> T createStreamOperator(
             StreamOperatorParameters<OUT> streamOperatorParameters) {
         AlignedTimestampsAndWatermarksOperator<OUT> operator =
-                new AlignedTimestampsAndWatermarksOperator<>(watermarkStrategy, true);
+                new AlignedTimestampsAndWatermarksOperator<>(watermarkStrategy, true, tableName);
 
         final OperatorID operatorId = streamOperatorParameters.getStreamConfig().getOperatorID();
         final OperatorEventDispatcher eventDispatcher =

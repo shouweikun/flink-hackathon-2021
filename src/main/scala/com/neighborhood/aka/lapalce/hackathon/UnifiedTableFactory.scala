@@ -103,6 +103,8 @@ class UnifiedTableFactory extends DynamicTableSourceFactory {
     val changelogParallelism = helper.getOptions.get(CHANGELOG_PARAL).intValue()
     val watermarkAlign = helper.getOptions.get(WATERMARK_ALIGN).booleanValue()
 
+    val tableName = context.getObjectIdentifier.toObjectPath
+
     new UnifiedTableSource(
       bulkTableSourceOption.map(_.asInstanceOf[ScanTableSource]).orNull,
       realtimeChangelogSource.asInstanceOf[ScanTableSource],
@@ -113,7 +115,8 @@ class UnifiedTableFactory extends DynamicTableSourceFactory {
       bulkParallelism,
       changelogParallelism,
       watermarkAlign,
-      disableBulk
+      disableBulk,
+      tableName
     )
   }
 

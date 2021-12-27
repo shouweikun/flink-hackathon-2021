@@ -16,6 +16,7 @@ import org.apache.flink.api.common.typeutils.TypeSerializer
 import org.apache.flink.streaming.api.datastream.DataStream
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment
 import org.apache.flink.table.api.TableSchema
+import org.apache.flink.table.catalog.ObjectPath
 import org.apache.flink.table.connector.ChangelogMode
 import org.apache.flink.table.connector.format.DecodingFormat
 import org.apache.flink.table.connector.source._
@@ -37,7 +38,8 @@ class UnifiedTableSource(
     private val bulkParallelism: Option[Int],
     private val changelogParallelism: Int,
     private val watermarkAlign: Boolean,
-    private val disableBulk: Boolean
+    private val disableBulk: Boolean,
+    private val tableName: ObjectPath
 ) extends ScanTableSource {
 
   private[source] class UnifiedDataStreamScanProvider(
@@ -47,7 +49,8 @@ class UnifiedTableSource(
       versionTypeSer: TypeSerializer[Versioned],
       changelogInputRowType: RowType,
       outputRowType: RowType,
-      outputTypeInformation: TypeInformation[RowData]
+      outputTypeInformation: TypeInformation[RowData],
+      tableName: ObjectPath
   ) extends DataStreamScanProvider {
 
     override def produceDataStream(
@@ -130,7 +133,8 @@ class UnifiedTableSource(
           "watermarkAlign",
           realtimeChangelogSource.getTransformation.getOutputType,
           new AlignedTimestampsAndWatermarksOperatorFactory[RowData, RowData](
-            WatermarkStrategy.forGenerator(watermarkGeneratorSupplier)
+            WatermarkStrategy.forGenerator(watermarkGeneratorSupplier),
+            tableName
           )
         )
       } else {
@@ -213,7 +217,8 @@ class UnifiedTableSource(
       versionTypeSer,
       changlogOutputRowType,
       outputRowType,
-      InternalTypeInfo.of(outputRowType)
+      InternalTypeInfo.of(outputRowType),
+      tableName
     )
 
   }
@@ -227,7 +232,8 @@ class UnifiedTableSource(
     bulkParallelism,
     changelogParallelism,
     watermarkAlign,
-    disableBulk
+    disableBulk,
+    tableName
   )
 
   override def asSummaryString(): String = "unified source"

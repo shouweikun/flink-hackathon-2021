@@ -4,6 +4,8 @@ public final class WatermarkAlignRequest implements WatermarkAlignEvent {
 
     private Long globalTs;
 
+    private final long checkpointId;
+
     public long getGlobalTs() {
         return globalTs;
     }
@@ -13,9 +15,17 @@ public final class WatermarkAlignRequest implements WatermarkAlignEvent {
         return this;
     }
 
-    public WatermarkAlignRequest(Long globalTs) {
+    public WatermarkAlignRequest setGlobalTs(Long globalTs) {
         this.globalTs = globalTs;
+        return this;
     }
 
-    public WatermarkAlignRequest() {}
+    public long getCheckpointId() {
+        return checkpointId;
+    }
+
+    public WatermarkAlignRequest(Long globalTs, long checkpointId) {
+        this.globalTs = globalTs;
+        this.checkpointId = checkpointId;
+    }
 }

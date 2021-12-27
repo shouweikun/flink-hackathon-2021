@@ -38,6 +38,13 @@ import org.apache.flink.streaming.runtime.streamstatus.StreamStatus;
 import org.apache.flink.streaming.runtime.streamstatus.StreamStatusMaintainer;
 import org.apache.flink.streaming.runtime.tasks.ProcessingTimeCallback;
 import org.apache.flink.streaming.runtime.tasks.StreamTask;
+import org.apache.flink.table.catalog.ObjectPath;
+
+import org.apache.flink.shaded.guava18.com.google.common.cache.Cache;
+import org.apache.flink.shaded.guava18.com.google.common.cache.CacheBuilder;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Optional;
 
@@ -59,7 +66,12 @@ public class AlignedTimestampsAndWatermarksOperator<T> extends AbstractStreamOpe
 
     private static final long serialVersionUID = 1L;
 
+    private static final Logger logger =
+            LoggerFactory.getLogger(AlignedTimestampsAndWatermarksOperator.class);
+
     private final WatermarkStrategy<T> watermarkStrategy;
+
+    private final ObjectPath tableName;
 
     /** The timestamp assigner. */
     private transient TimestampAssigner<T> timestampAssigner;
@@ -68,14 +80,16 @@ public class AlignedTimestampsAndWatermarksOperator<T> extends AbstractStreamOpe
     private transient WatermarkGenerator<T> watermarkGenerator;
 
     /** The watermark output gateway, initialized during runtime. */
-    private transient WatermarkOutput wmOutput;
+    private transient WatermarkOutput dummyWmOutput;
+
+    private transient WatermarkEmitter internalWatermarkEmitter;
 
     /** The interval (in milliseconds) for periodic watermark probes. Initialized during runtime. */
     private transient long watermarkInterval;
 
     private transient Watermark currentLocalWatermark;
 
-    private transient Watermark globalWatermark;
+    private transient Cache<Long, Watermark> globalWatermarks;
 
     private transient OperatorEventGateway operatorEventGateway;
 
@@ -87,10 +101,13 @@ public class AlignedTimestampsAndWatermarksOperator<T> extends AbstractStreamOpe
     private final boolean emitProgressiveWatermarks;
 
     public AlignedTimestampsAndWatermarksOperator(
-            WatermarkStrategy<T> watermarkStrategy, boolean emitProgressiveWatermarks) {
+            WatermarkStrategy<T> watermarkStrategy,
+            boolean emitProgressiveWatermarks,
+            ObjectPath tableName) {
         this.watermarkStrategy = checkNotNull(watermarkStrategy);
         this.emitProgressiveWatermarks = emitProgressiveWatermarks;
         this.chainingStrategy = ChainingStrategy.DEFAULT_CHAINING_STRATEGY;
+        this.tableName = tableName;
     }
 
     @Override
@@ -108,13 +125,10 @@ public class AlignedTimestampsAndWatermarksOperator<T> extends AbstractStreamOpe
                 emitProgressiveWatermarks
                         ? watermarkStrategy.createWatermarkGenerator(this::getMetricGroup)
                         : new NoWatermarksGenerator<>();
-
-        wmOutput =
+        internalWatermarkEmitter =
+                new WatermarkEmitter(output, getContainingTask().getStreamStatusMaintainer());
+        dummyWmOutput =
                 new WatermarkOutput() {
-
-                    WatermarkEmitter internalEmitter =
-                            new WatermarkEmitter(
-                                    output, getContainingTask().getStreamStatusMaintainer());
 
                     @Override
                     public void emitWatermark(Watermark watermark) {
@@ -124,23 +138,25 @@ public class AlignedTimestampsAndWatermarksOperator<T> extends AbstractStreamOpe
                                                 < watermark.getTimestamp())) {
                             currentLocalWatermark = watermark;
                         }
-
-                        if (globalWatermark != null) {
-                            internalEmitter.emitWatermark(globalWatermark);
-                        }
+                        // we never emit watermark here, just update current local watermark.
                     }
 
                     @Override
                     public void markIdle() {
-                        internalEmitter.markIdle();
+                        internalWatermarkEmitter.markIdle();
                     }
                 };
 
         watermarkInterval = getExecutionConfig().getAutoWatermarkInterval();
-        if (watermarkInterval > 0 && emitProgressiveWatermarks) {
+        if (watermarkInterval < 0) {
+            watermarkInterval = 200L;
+        }
+        if (emitProgressiveWatermarks) {
             final long now = getProcessingTimeService().getCurrentProcessingTime();
             getProcessingTimeService().registerTimer(now + watermarkInterval, this);
         }
+
+        globalWatermarks = CacheBuilder.newBuilder().maximumSize(3).build();
     }
 
     @Override
@@ -149,7 +165,8 @@ public class AlignedTimestampsAndWatermarksOperator<T> extends AbstractStreamOpe
         if (operatorEvent instanceof WatermarkAlignRequest) {
             WatermarkAlignRequest request = (WatermarkAlignRequest) operatorEvent;
 
-            Optional.ofNullable(request.getGlobalTs()).ifPresent(ts -> updateGlobalWatermark(ts));
+            Optional.ofNullable(request.getGlobalTs())
+                    .ifPresent(ts -> addGlobalWatermark(ts, request.getCheckpointId()));
 
             operatorEventGateway.sendEventToCoordinator(
                     new WatermarkAlignAck(
@@ -159,9 +176,6 @@ public class AlignedTimestampsAndWatermarksOperator<T> extends AbstractStreamOpe
                                     .orElse(null)));
 
         } else if (operatorEvent instanceof ReportLocalWatermarkAck) {
-            ReportLocalWatermarkAck watermarkAck = (ReportLocalWatermarkAck) operatorEvent;
-            Optional.ofNullable(watermarkAck.getGlobalTs())
-                    .ifPresent(ts -> updateGlobalWatermark(ts));
             reportingLocalWatermarkMessageIsOnTheWay = false;
         }
     }
@@ -175,15 +189,16 @@ public class AlignedTimestampsAndWatermarksOperator<T> extends AbstractStreamOpe
 
         element.setTimestamp(newTimestamp);
         output.collect(element);
-        watermarkGenerator.onEvent(event, newTimestamp, wmOutput);
+        watermarkGenerator.onEvent(event, newTimestamp, dummyWmOutput);
     }
 
     @Override
     public void onProcessingTime(long timestamp) throws Exception {
-        watermarkGenerator.onPeriodicEmit(wmOutput);
+        watermarkGenerator.onPeriodicEmit(dummyWmOutput);
 
         if (reportingLocalWatermarkMessageIsOnTheWay == null
                 || (!reportingLocalWatermarkMessageIsOnTheWay)) {
+            // report local watermark
             operatorEventGateway.sendEventToCoordinator(
                     new ReportLocalWatermark(
                             indexOfThisSubtask,
@@ -195,24 +210,34 @@ public class AlignedTimestampsAndWatermarksOperator<T> extends AbstractStreamOpe
         getProcessingTimeService().registerTimer(now + watermarkInterval, this);
     }
 
+    @Override
+    public void prepareSnapshotPreBarrier(long checkpointId) throws Exception {
+        super.prepareSnapshotPreBarrier(checkpointId);
+        Optional.ofNullable(globalWatermarks.getIfPresent(checkpointId))
+                .ifPresent(
+                        watermark -> {
+                            logger.info(
+                                    "table:"
+                                            + tableName
+                                            + " send aligned watermark:"
+                                            + watermark.getTimestamp());
+                            internalWatermarkEmitter.emitWatermark(watermark);
+                        });
+    }
+
     /**
-     * Override the base implementation to completely ignore watermarks propagated from upstream,
-     * except for the "end of time" watermark.
+     * Override the base implementation to completely ignore watermarks propagated from upstream.
      */
     @Override
     public void processWatermark(org.apache.flink.streaming.api.watermark.Watermark mark)
             throws Exception {
-        // if we receive a Long.MAX_VALUE watermark we forward it since it is used
-        // to signal the end of input and to not block watermark progress downstream
-        if (mark.getTimestamp() == Long.MAX_VALUE) {
-            wmOutput.emitWatermark(Watermark.MAX_WATERMARK);
-        }
+       //do nothing
     }
 
     @Override
     public void close() throws Exception {
         super.close();
-        watermarkGenerator.onPeriodicEmit(wmOutput);
+        watermarkGenerator.onPeriodicEmit(dummyWmOutput);
     }
 
     // ------------------------------------------------------------------------
@@ -238,7 +263,7 @@ public class AlignedTimestampsAndWatermarksOperator<T> extends AbstractStreamOpe
         }
 
         @Override
-        public void emitWatermark(Watermark watermark) {
+        public final void emitWatermark(Watermark watermark) {
             final long ts = watermark.getTimestamp();
 
             if (ts <= currentWatermark) {
@@ -268,12 +293,10 @@ public class AlignedTimestampsAndWatermarksOperator<T> extends AbstractStreamOpe
         return this;
     }
 
-    private void updateGlobalWatermark(long ts) {
-        if (globalWatermark == null) {
-            globalWatermark = new Watermark(ts);
-        } else if (globalWatermark.getTimestamp() < ts) {
-            globalWatermark = new Watermark(ts);
-        }
+    private void addGlobalWatermark(long ts, long checkpointId) {
+        long nextId = checkpointId + 1;
+        logger.info("receive aligned watermark for checkpointId " + nextId);
+        globalWatermarks.put(nextId, new Watermark(ts));
     }
 
     @VisibleForTesting

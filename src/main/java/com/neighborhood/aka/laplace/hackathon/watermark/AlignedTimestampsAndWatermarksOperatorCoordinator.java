@@ -104,7 +104,8 @@ public class AlignedTimestampsAndWatermarksOperatorCoordinator
         final CountDownLatch countDownLatch = new CountDownLatch(parallelism);
         this.alignCountDownLatch = countDownLatch;
 
-        final WatermarkAlignRequest event = new WatermarkAlignRequest(globalWatermark);
+        final WatermarkAlignRequest event =
+                new WatermarkAlignRequest(globalWatermark, checkpointId);
 
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         ObjectOutputStream oos = new ObjectOutputStream(baos);
