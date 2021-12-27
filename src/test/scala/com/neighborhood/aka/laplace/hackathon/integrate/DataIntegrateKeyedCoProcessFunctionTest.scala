@@ -196,13 +196,13 @@ class DataIntegrateKeyedCoProcessFunctionTest {
       1,
       1,
       RowKind.INSERT,
-      Versioned.of(fixedDelay - 1, fixedDelay - 1, false)
+      Versioned.of(fixedDelay - 1, Array(fixedDelay - 1), false)
     )
     val changelogData2 = createChangelogStreamRecord(
       1,
       1,
       RowKind.DELETE,
-      Versioned.of(fixedDelay + 1, fixedDelay + 1, false)
+      Versioned.of(fixedDelay + 1, Array(fixedDelay + 1), false)
     )
 
     //non-aligned
@@ -217,14 +217,18 @@ class DataIntegrateKeyedCoProcessFunctionTest {
           .getValue
       )
     )
+
     harnessWithoutWatermarkAlign.processElement2(changelogData2)
+    val out = harnessWithoutWatermarkAlign.getOutput
+      .poll()
+      .asInstanceOf[StreamRecord[RowData]]
+      .getValue
+    val projected = copyRowProjection.apply(changelogData2.getValue)
+    projected.setRowKind(out.getRowKind)
     assertTrue(
       changelogRecordEqualiser.equals(
-        copyRowProjection.apply(changelogData2.getValue),
-        harnessWithoutWatermarkAlign.getOutput
-          .poll()
-          .asInstanceOf[StreamRecord[RowData]]
-          .getValue
+        projected,
+        out
       )
     )
 
@@ -244,7 +248,7 @@ class DataIntegrateKeyedCoProcessFunctionTest {
       1,
       1,
       RowKind.UPDATE_AFTER,
-      Versioned.of(fixedDelay - 1, fixedDelay - 1, false)
+      Versioned.of(fixedDelay - 1, Array(fixedDelay - 1), false)
     )
 
     harnessWithoutWatermarkAlign.processElement2(changelogData)
@@ -279,7 +283,7 @@ class DataIntegrateKeyedCoProcessFunctionTest {
       1,
       1,
       RowKind.DELETE,
-      Versioned.of(fixedDelay - 1, fixedDelay - 1, false)
+      Versioned.of(fixedDelay - 1, Array(fixedDelay - 1), false)
     )
 
     harnessWithoutWatermarkAlign.processElement2(changelogData)
@@ -300,7 +304,7 @@ class DataIntegrateKeyedCoProcessFunctionTest {
       1,
       1,
       RowKind.INSERT,
-      Versioned.of(fixedDelay - 1, fixedDelay - 1, false)
+      Versioned.of(fixedDelay - 1, Array(fixedDelay - 1), false)
     )
 
     harnessWithoutWatermarkAlign.processElement2(changelogData)

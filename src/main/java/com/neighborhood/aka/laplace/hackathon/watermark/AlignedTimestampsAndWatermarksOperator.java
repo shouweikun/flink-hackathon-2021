@@ -221,7 +221,7 @@ public class AlignedTimestampsAndWatermarksOperator<T> extends AbstractStreamOpe
                                             + tableName
                                             + " send aligned watermark:"
                                             + watermark.getTimestamp()
-                                            + "before checkpointId:"
+                                            + "before checkpointId: "
                                             + checkpointId);
                             internalWatermarkEmitter.emitWatermark(watermark);
                         });

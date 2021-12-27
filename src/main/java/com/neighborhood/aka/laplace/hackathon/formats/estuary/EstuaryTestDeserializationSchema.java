@@ -21,10 +21,8 @@ import com.neighborhood.aka.laplace.hackathon.version.Versioned;
 import javax.annotation.Nullable;
 
 import java.io.IOException;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
+import java.util.function.Function;
 
 import static java.lang.String.format;
 import static org.apache.flink.util.Preconditions.checkNotNull;
@@ -61,9 +59,13 @@ public class EstuaryTestDeserializationSchema extends AbstractVersionedDeseriali
     /** Timestamp format specification which is used to parse timestamp. */
     private final TimestampFormat timestampFormat;
 
-    private final String tsFieldName;
+    private final String dbType;
 
-    private RowData dummyRow;
+    private transient String tsFieldName;
+
+    private transient Function<JsonNode, long[]> versionExtractFunction;
+
+    private transient RowData dummyRow;
 
     public EstuaryTestDeserializationSchema(
             RowType rowType,
@@ -88,6 +90,12 @@ public class EstuaryTestDeserializationSchema extends AbstractVersionedDeseriali
             objectMapper.enable(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS);
         }
         objectMapper.configure(JsonReadFeature.ALLOW_UNESCAPED_CONTROL_CHARS.mappedFeature(), true);
+        this.dbType = dbType;
+    }
+
+    @Override
+    public void open(InitializationContext context) throws Exception {
+        this.dummyRow = new GenericRowData(getRowDataType().getFieldCount());
 
         if (dbType.equals("mysql")) {
             tsFieldName = MYSQL_TS_FIELD_NAME;
@@ -98,11 +106,23 @@ public class EstuaryTestDeserializationSchema extends AbstractVersionedDeseriali
         } else {
             throw new IllegalArgumentException();
         }
-    }
 
-    @Override
-    public void open(InitializationContext context) throws Exception {
-        this.dummyRow = new GenericRowData(getRowDataType().getFieldCount());
+        if (dbType.equals("mysql")) {
+            versionExtractFunction =
+                    jsonNode -> {
+                        JsonNode binlog = jsonNode.get("binlogPosition");
+                        long offset = binlog.get("offset").asLong();
+                        long file = Long.valueOf(binlog.get("file").asText().split("\\.")[1]);
+                        return new long[] {file, offset, 0};
+                    };
+        } else {
+            versionExtractFunction =
+                    jsonNode -> {
+                        final String tsFieldName = this.tsFieldName;
+                        long ts = jsonNode.get(tsFieldName).asLong();
+                        return new long[] {ts, 0};
+                    };
+        }
     }
 
     public Collection<Tuple2<RowData, Versioned>> deserializeInternal(@Nullable byte[] message)
@@ -118,26 +138,32 @@ public class EstuaryTestDeserializationSchema extends AbstractVersionedDeseriali
                             .map(String::trim)
                             .orElse(null);
             long ts = rootJsonNode.get(tsFieldName).asLong();
+            long[] version = versionExtractFunction.apply(rootJsonNode);
             if (eventType.equals("i")) {
                 return ImmutableList.of(
                         Tuple2.of(
                                 convertToRowData(rootJsonNode.get(AFTER)),
-                                Versioned.of(ts, ts, false)));
+                                Versioned.of(ts, version, false)));
             } else if (eventType.equals("d")) {
                 return ImmutableList.of(
                         Tuple2.of(
                                 convertToRowData(rootJsonNode.get(BEFORE)),
-                                Versioned.of(ts, ts, false)));
+                                Versioned.of(ts, version, false)));
             } else if (eventType.equals("u")) {
+
+                long[] afterVersion = Arrays.copyOf(version, version.length);
+                int index = afterVersion.length - 1;
+                afterVersion[index] = afterVersion[index] + 1;
+
                 return ImmutableList.of(
                         Tuple2.of(
                                 convertToRowData(rootJsonNode.get(BEFORE)),
-                                Versioned.of(ts, ts, false)),
+                                Versioned.of(ts, version, false)),
                         Tuple2.of(
                                 convertToRowData(rootJsonNode.get(AFTER)),
-                                Versioned.of(ts, ts + 1, false)));
+                                Versioned.of(ts, afterVersion, false)));
             } else {
-                return ImmutableList.of(Tuple2.of(dummyRow, Versioned.of(ts, ts, true)));
+                return ImmutableList.of(Tuple2.of(dummyRow, Versioned.of(ts, null, true)));
             }
         } catch (Throwable t) {
             if (ignoreParseErrors) {

@@ -35,7 +35,7 @@ class TestChangelogDeserializationSchema(
         row.setField(1, v)
         val version = new Versioned()
         version.setGeneratedTs(ts)
-        version.setUnifiedVersion(ts)
+        version.setUnifiedVersion(Array(ts))
         rowKindStr.trim match {
           case "i"  => row.setRowKind(RowKind.INSERT)
           case "d"  => row.setRowKind(RowKind.DELETE)

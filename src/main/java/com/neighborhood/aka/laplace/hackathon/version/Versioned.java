@@ -1,11 +1,12 @@
 package com.neighborhood.aka.laplace.hackathon.version;
 
 import java.io.Serializable;
+import java.util.Arrays;
 import java.util.Objects;
 
 public final class Versioned implements Comparable<Versioned>, Serializable {
 
-    public static Versioned of(long generatedTs, long unifiedVersion, boolean isHeartbeat) {
+    public static Versioned of(long generatedTs, long[] unifiedVersion, boolean isHeartbeat) {
 
         Versioned versioned = new Versioned(isHeartbeat);
         versioned.setUnifiedVersion(unifiedVersion);
@@ -15,7 +16,7 @@ public final class Versioned implements Comparable<Versioned>, Serializable {
 
     private long generatedTs;
 
-    private long unifiedVersion;
+    private long[] unifiedVersion;
 
     private final boolean isHeartbeat;
 
@@ -36,11 +37,11 @@ public final class Versioned implements Comparable<Versioned>, Serializable {
         return this;
     }
 
-    public long getUnifiedVersion() {
+    public long[] getUnifiedVersion() {
         return unifiedVersion;
     }
 
-    public Versioned setUnifiedVersion(long unifiedVersion) {
+    public Versioned setUnifiedVersion(long[] unifiedVersion) {
         this.unifiedVersion = unifiedVersion;
         return this;
     }
@@ -51,7 +52,20 @@ public final class Versioned implements Comparable<Versioned>, Serializable {
 
     @Override
     public int compareTo(Versioned o) {
-        return Long.compare(this.unifiedVersion, o.unifiedVersion);
+        long[] thisArray = this.unifiedVersion;
+        long[] otherArray = o.unifiedVersion;
+        if (thisArray.length != otherArray.length) {
+            throw new RuntimeException();
+        }
+
+        for (int i = 0; i < thisArray.length; i++) {
+            int compare = Long.compare(thisArray[i], otherArray[i]);
+            if (compare == 0) {
+                continue;
+            }
+            return compare;
+        }
+        return 0;
     }
 
     @Override
@@ -60,7 +74,7 @@ public final class Versioned implements Comparable<Versioned>, Serializable {
                 + "generatedTs="
                 + generatedTs
                 + ", unifiedVersion="
-                + unifiedVersion
+                + Arrays.asList(unifiedVersion)
                 + '}';
     }
 
