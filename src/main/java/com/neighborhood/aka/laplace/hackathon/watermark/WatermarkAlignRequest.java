@@ -6,7 +6,7 @@ public final class WatermarkAlignRequest implements WatermarkAlignEvent {
 
     private final long checkpointId;
 
-    public long getGlobalTs() {
+    public Long getGlobalTs() {
         return globalTs;
     }
 

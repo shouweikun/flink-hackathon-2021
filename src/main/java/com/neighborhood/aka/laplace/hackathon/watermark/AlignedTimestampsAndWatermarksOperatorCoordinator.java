@@ -83,12 +83,12 @@ public class AlignedTimestampsAndWatermarksOperatorCoordinator
 
         if (operatorEvent instanceof ReportLocalWatermark) {
             ReportLocalWatermark event = (ReportLocalWatermark) operatorEvent;
-            putLocalWatermarkAndUpdateToAlign(event.getSubtask(), event.getLocalTs());
+            putLocalWatermarkIfNotNullAndUpdateToAlign(event.getSubtask(), event.getLocalTs());
             Long globalWatermark = getGlobalWatermark();
             sendEvent(subtaskGateways[subTaskId], new ReportLocalWatermarkAck(globalWatermark));
         } else if (operatorEvent instanceof WatermarkAlignAck) {
             WatermarkAlignAck event = (WatermarkAlignAck) operatorEvent;
-            putLocalWatermarkAndUpdateToAlign(event.getSubtask(), event.getLocalTs());
+            putLocalWatermarkIfNotNullAndUpdateToAlign(event.getSubtask(), event.getLocalTs());
             alignCountDownLatch.countDown();
         }
     }
@@ -179,7 +179,12 @@ public class AlignedTimestampsAndWatermarksOperatorCoordinator
                         messageDeliveryCheckExecutorService);
     }
 
-    private void putLocalWatermarkAndUpdateToAlign(Integer subtaskId, Long localWatermark) {
+    private void putLocalWatermarkIfNotNullAndUpdateToAlign(
+            Integer subtaskId, Long localWatermark) {
+
+        if (localWatermark == null) {
+            return;
+        }
         Map<Integer, Long> subtaskIdAndLocalWatermark = this.context.subtaskIdAndLocalWatermark;
         if (!subtaskIdAndLocalWatermark.containsKey(subtaskId)) {
             subtaskIdAndLocalWatermark.put(subtaskId, localWatermark);

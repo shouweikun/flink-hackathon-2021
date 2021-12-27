@@ -1,6 +1,5 @@
 package com.neighborhood.aka.lapalce.hackathon.watermark;
 
-import com.neighborhood.aka.laplace.hackathon.watermark.WatermarkAlignRequest;
 import org.apache.flink.api.common.eventtime.TimestampAssigner;
 import org.apache.flink.api.common.eventtime.Watermark;
 import org.apache.flink.api.common.eventtime.WatermarkGenerator;
@@ -14,7 +13,7 @@ import org.apache.flink.streaming.util.OneInputStreamOperatorTestHarness;
 import org.apache.flink.table.catalog.ObjectPath;
 
 import com.neighborhood.aka.laplace.hackathon.watermark.AlignedTimestampsAndWatermarksOperator;
-import com.neighborhood.aka.laplace.hackathon.watermark.ReportLocalWatermarkAck;
+import com.neighborhood.aka.laplace.hackathon.watermark.WatermarkAlignRequest;
 import org.junit.Test;
 
 import java.io.Serializable;
@@ -68,21 +67,20 @@ public class AlignedTimestampsAndWatermarksOperatorTest {
     }
 
     @Test
-    public void testProcessWatermarkOnPreProcessBarrier() throws Exception{
+    public void testProcessWatermarkOnPreProcessBarrier() throws Exception {
 
         OneInputStreamOperatorTestHarness<Tuple2<Boolean, Long>, Tuple2<Boolean, Long>>
                 testHarness =
-                createTestHarness(
-                        WatermarkStrategy.forGenerator(
-                                (ctx) -> new PunctuatedWatermarkGenerator())
-                                .withTimestampAssigner((ctx) -> new TupleExtractor()));
+                        createTestHarness(
+                                WatermarkStrategy.forGenerator(
+                                                (ctx) -> new PunctuatedWatermarkGenerator())
+                                        .withTimestampAssigner((ctx) -> new TupleExtractor()));
 
         testHarness.processElement(new StreamRecord<>(new Tuple2<>(true, 1000L), 1));
 
         pollNextStreamRecord(testHarness);
         syncCurrLocalTsToGlobal((AlignedTimestampsAndWatermarksOperator) testHarness.getOperator());
         assertThat(pollNextLegacyWatermark(testHarness), is(legacyWatermark(1000L)));
-
     }
 
     @Test
@@ -134,7 +132,6 @@ public class AlignedTimestampsAndWatermarksOperatorTest {
 
         assertThat(pollNextLegacyWatermark(testHarness), is(legacyWatermark(2L)));
         assertThat(pollNextStreamRecord(testHarness), streamRecord(new Tuple2<>(true, 2L), 2L));
-
 
         testHarness.processElement(new StreamRecord<>(new Tuple2<>(true, 4L), 1));
         pollNextStreamRecord(testHarness);
@@ -202,7 +199,8 @@ public class AlignedTimestampsAndWatermarksOperatorTest {
         return testHarness;
     }
 
-    private static void syncCurrLocalTsToGlobal(AlignedTimestampsAndWatermarksOperator operator) throws Exception {
+    private static void syncCurrLocalTsToGlobal(AlignedTimestampsAndWatermarksOperator operator)
+            throws Exception {
         Long ts =
                 Optional.ofNullable(operator.getCurrentLocalWatermark())
                         .flatMap(wm -> Optional.ofNullable(wm.getTimestamp()))

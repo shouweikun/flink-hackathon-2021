@@ -231,7 +231,7 @@ public class AlignedTimestampsAndWatermarksOperator<T> extends AbstractStreamOpe
     @Override
     public void processWatermark(org.apache.flink.streaming.api.watermark.Watermark mark)
             throws Exception {
-       //do nothing
+        // do nothing
     }
 
     @Override
@@ -295,7 +295,7 @@ public class AlignedTimestampsAndWatermarksOperator<T> extends AbstractStreamOpe
 
     private void addGlobalWatermark(long ts, long checkpointId) {
         long nextId = checkpointId + 1;
-        logger.info("receive aligned watermark for checkpointId " + nextId);
+        logger.info("receive aligned watermark for checkpointId " + nextId + " ts is " + ts);
         globalWatermarks.put(nextId, new Watermark(ts));
     }
 

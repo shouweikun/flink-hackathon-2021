@@ -92,12 +92,12 @@ public class WatermarkAlignSupport {
         if (currentCheckpointIdAndAlignTs == null
                 || currentCheckpointIdAndAlignTs.checkpointId < checkpointId) {
             currentCheckpointIdAndAlignTs = null;
-            Long globalTs = getGlobalTs();
+            Long globalTs = getGlobalTsInternal();
             currentCheckpointIdAndAlignTs = new CheckpointIdAndAlignTs(globalTs, checkpointId);
             logger.info(
                     "WarkmarkAlignSupport process checkpointCoordinator:"
                             + checkpointId
-                            + "global ts:"
+                            + "global Internal ts:"
                             + globalTs);
             return true;
         } else {

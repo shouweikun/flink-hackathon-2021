@@ -112,9 +112,11 @@ class DataIntegrateKeyedCoProcessFunction(
       out: Collector[RowData]
   ): Unit = {
     def collectRow(rowData: RowData): Unit = {
-      logger.info(
-        s"collect row at:$timestamp, watermark:${ctx.timerService().currentWatermark()}"
-      )
+      if (isDebug) {
+        logger.info(
+          s"collect row at:$timestamp, watermark:${ctx.timerService().currentWatermark()}"
+        )
+      }
       out.collect(rowData)
     }
     //start part of changelog data
