@@ -118,20 +118,23 @@ public class EstuaryTestDeserializationSchema extends AbstractVersionedDeseriali
                         return new long[] {file, offset, 0};
                     };
         } else if (dbType.equals("sqlserver")) {
+
+            final Cache<Long, Long> tsCounterCache =
+                    CacheBuilder.newBuilder().maximumSize(5).build();
+            final String tsFieldName = this.tsFieldName;
+
             versionExtractFunction =
                     jsonNode -> {
-                        final Cache<Long, Long> tsCounterCache =
-                                CacheBuilder.newBuilder().maximumSize(5).build();
-                        final String tsFieldName = this.tsFieldName;
                         long ts = jsonNode.get(tsFieldName).asLong();
-                        Long count = tsCounterCache.getIfPresent(ts);
+                        long currProcessTs = System.currentTimeMillis();
+                        Long count = tsCounterCache.getIfPresent(currProcessTs);
                         if (count == null) {
                             count = 0L;
                         } else {
                             count++;
                         }
-                        tsCounterCache.put(ts, count);
-                        return new long[] {ts, count, 0};
+                        tsCounterCache.put(currProcessTs, count);
+                        return new long[] {ts, currProcessTs, count, 0};
                     };
         } else {
             versionExtractFunction =

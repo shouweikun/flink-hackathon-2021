@@ -75,8 +75,8 @@ public final class Versioned implements Comparable<Versioned>, Serializable {
                 + "generatedTs="
                 + generatedTs
                 + ", unifiedVersion="
-                + Arrays.asList(unifiedVersion).stream()
-                        .map(String::valueOf)
+                + Arrays.stream(unifiedVersion)
+                        .mapToObj(String::valueOf)
                         .collect(Collectors.joining(","))
                 + '}';
     }
