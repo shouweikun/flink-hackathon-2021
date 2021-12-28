@@ -26,6 +26,7 @@ import org.apache.flink.table.runtime.typeutils.InternalTypeInfo
 import org.apache.flink.table.types.logical.RowType
 import org.apache.flink.table.utils.TableSchemaUtils
 import org.apache.flink.types.RowKind
+import org.slf4j.LoggerFactory
 
 import javax.annotation.Nullable
 
@@ -147,12 +148,19 @@ class UnifiedTableSource(
       val heartbeatFilter = watermarked.filter(new FilterFunction[RowData] {
 
         final val typeSer = versionTypeSer
+        final val _tableName = tableName
+        final val logger =
+          LoggerFactory.getLogger(s"heartbeat_filter_for_${_tableName}")
 
         override def filter(value: RowData): Boolean = {
-          !value
+          val result = !value
             .getRawValue(value.getArity - 1)
             .toObject(typeSer)
             .isHeartbeat
+          if (!result) {
+            logger.info("receive heartbeat, filter it.")
+          }
+          result
         }
       })
 

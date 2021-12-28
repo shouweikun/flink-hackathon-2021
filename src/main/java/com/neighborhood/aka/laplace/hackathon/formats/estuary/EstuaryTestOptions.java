@@ -52,6 +52,12 @@ public class EstuaryTestOptions {
                     .withDescription(
                             "Optional flag to specify whether to encode all decimals as plain numbers instead of possible scientific notations, false by default.");
 
+    public static final ConfigOption<Boolean> IGNORE_HEARTBEAT =
+            ConfigOptions.key("ignore-heartbeat")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription("");
+
     public static final ConfigOption<String> DB_TYPE =
             ConfigOptions.key("db-type").stringType().noDefaultValue().withDescription("");
 

@@ -49,6 +49,8 @@ public class EstuaryTestDeserializationSchema extends AbstractVersionedDeseriali
     /** Flag indicating whether to ignore invalid fields/rows (default: throw an exception). */
     private final boolean ignoreParseErrors;
 
+    private final boolean ignoreHeartbeat;
+
     /**
      * Runtime converter that converts {@link JsonNode}s into objects of Flink SQL internal data
      * structures.
@@ -74,7 +76,8 @@ public class EstuaryTestDeserializationSchema extends AbstractVersionedDeseriali
             boolean failOnMissingField,
             boolean ignoreParseErrors,
             TimestampFormat timestampFormat,
-            String dbType) {
+            String dbType,
+            boolean ignoreHeartbeat) {
         super(rowType);
         if (ignoreParseErrors && failOnMissingField) {
             throw new IllegalArgumentException(
@@ -93,6 +96,7 @@ public class EstuaryTestDeserializationSchema extends AbstractVersionedDeseriali
         }
         objectMapper.configure(JsonReadFeature.ALLOW_UNESCAPED_CONTROL_CHARS.mappedFeature(), true);
         this.dbType = dbType;
+        this.ignoreHeartbeat = ignoreHeartbeat;
     }
 
     @Override
@@ -183,8 +187,10 @@ public class EstuaryTestDeserializationSchema extends AbstractVersionedDeseriali
                         Tuple2.of(
                                 convertToRowData(rootJsonNode.get(AFTER)),
                                 Versioned.of(ts, afterVersion, false)));
-            } else {
+            } else if ((!ignoreHeartbeat) && eventType.equals("h")) {
                 return ImmutableList.of(Tuple2.of(dummyRow, Versioned.of(ts, null, true)));
+            } else {
+                return Collections.EMPTY_LIST;
             }
         } catch (Throwable t) {
             if (ignoreParseErrors) {

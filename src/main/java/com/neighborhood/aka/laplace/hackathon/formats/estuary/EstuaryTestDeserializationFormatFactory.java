@@ -39,13 +39,15 @@ public class EstuaryTestDeserializationFormatFactory implements DeserializationF
                 final TimestampFormat timestampFormat =
                         EstuaryTestOptionsUtil.getTimestampFormat(readableConfig);
                 final String dbType = readableConfig.get(DB_TYPE);
+                final boolean ignoreHeartbeat = readableConfig.get(IGNORE_HEARTBEAT);
 
                 return new EstuaryTestDeserializationSchema(
                         logicalType,
                         failOnMissingField,
                         ignoreParseErrors,
                         timestampFormat,
-                        dbType);
+                        dbType,
+                        ignoreHeartbeat);
             }
 
             @Override
@@ -80,6 +82,7 @@ public class EstuaryTestDeserializationFormatFactory implements DeserializationF
         options.add(MAP_NULL_KEY_LITERAL);
         options.add(ENCODE_DECIMAL_AS_PLAIN_NUMBER);
         options.add(DB_TYPE);
+        options.add(IGNORE_HEARTBEAT);
         return options;
     }
 }
