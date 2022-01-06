@@ -20,7 +20,11 @@ import org.apache.flink.configuration.{
   ConfigOptions,
   ReadableConfig
 }
-import org.apache.flink.table.catalog.{CatalogTable, ObjectIdentifier}
+import org.apache.flink.table.catalog.{
+  CatalogTable,
+  ObjectIdentifier,
+  ResolvedCatalogTable
+}
 import org.apache.flink.table.connector.format.DecodingFormat
 import org.apache.flink.table.connector.source.{
   DynamicTableSource,
@@ -141,13 +145,13 @@ object UnifiedTableFactory {
   val CHANGELOG_PREFIX = "_changelog."
 
   private class InternalContext(
-      catalogTable: CatalogTable,
+      catalogTable: ResolvedCatalogTable,
       outerContext: DynamicTableFactory.Context
   ) extends DynamicTableFactory.Context {
     override def getObjectIdentifier: ObjectIdentifier =
       outerContext.getObjectIdentifier
 
-    override def getCatalogTable: CatalogTable = catalogTable
+    override def getCatalogTable: ResolvedCatalogTable = catalogTable
 
     override def getConfiguration: ReadableConfig =
       outerContext.getConfiguration

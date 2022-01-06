@@ -1,7 +1,7 @@
 package com.neighborhood.aka.laplace.hackathon.formats.estuary;
 
 import org.apache.flink.configuration.ReadableConfig;
-import org.apache.flink.formats.json.TimestampFormat;
+import org.apache.flink.formats.common.TimestampFormat;
 import org.apache.flink.table.api.TableException;
 import org.apache.flink.table.api.ValidationException;
 

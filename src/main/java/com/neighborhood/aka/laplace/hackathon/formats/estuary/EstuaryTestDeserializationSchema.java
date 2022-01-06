@@ -1,8 +1,8 @@
 package com.neighborhood.aka.laplace.hackathon.formats.estuary;
 
 import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.formats.common.TimestampFormat;
 import org.apache.flink.formats.json.JsonToRowDataConverters;
-import org.apache.flink.formats.json.TimestampFormat;
 import org.apache.flink.table.data.GenericRowData;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.types.logical.DecimalType;
