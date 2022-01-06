@@ -3,6 +3,7 @@ package com.neighborhood.aka.laplace.hackathon.formats.estuary;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.formats.common.TimestampFormat;
 import org.apache.flink.formats.json.JsonToRowDataConverters;
+import org.apache.flink.table.catalog.ObjectPath;
 import org.apache.flink.table.data.GenericRowData;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.types.logical.DecimalType;
@@ -51,6 +52,8 @@ public class EstuaryTestDeserializationSchema extends AbstractVersionedDeseriali
 
     private final boolean ignoreHeartbeat;
 
+    private final ObjectPath tableName;
+
     /**
      * Runtime converter that converts {@link JsonNode}s into objects of Flink SQL internal data
      * structures.
@@ -77,6 +80,7 @@ public class EstuaryTestDeserializationSchema extends AbstractVersionedDeseriali
             boolean ignoreParseErrors,
             TimestampFormat timestampFormat,
             String dbType,
+            @Nullable ObjectPath tableName,
             boolean ignoreHeartbeat) {
         super(rowType);
         if (ignoreParseErrors && failOnMissingField) {
@@ -85,6 +89,7 @@ public class EstuaryTestDeserializationSchema extends AbstractVersionedDeseriali
         }
         this.failOnMissingField = failOnMissingField;
         this.ignoreParseErrors = ignoreParseErrors;
+        this.tableName = tableName;
         this.runtimeConverter =
                 new JsonToRowDataConverters(failOnMissingField, ignoreParseErrors, timestampFormat)
                         .createConverter(checkNotNull(rowType));
@@ -164,6 +169,14 @@ public class EstuaryTestDeserializationSchema extends AbstractVersionedDeseriali
                             .orElse(null);
             long ts = rootJsonNode.get(tsFieldName).asLong();
             long[] version = versionExtractFunction.apply(rootJsonNode);
+            if (tableName != null) {
+                String tableNameFromData = rootJsonNode.get("tableName").asText();
+                String databaseNameFromData = rootJsonNode.get("databaseName").asText();
+                if (!tableName.getDatabaseName().equals(databaseNameFromData)
+                        || !tableName.getObjectName().equals(tableNameFromData)) {
+                    return ImmutableList.of(Tuple2.of(dummyRow, Versioned.of(ts, null, true)));
+                }
+            }
             if (eventType.equals("i")) {
                 return ImmutableList.of(
                         Tuple2.of(

@@ -58,6 +58,9 @@ public class EstuaryTestOptions {
                     .defaultValue(false)
                     .withDescription("");
 
+    public static final ConfigOption<String> CONCERNED_TABLE_NAME =
+            ConfigOptions.key("concerned-table-name").stringType().noDefaultValue();
+
     public static final ConfigOption<String> DB_TYPE =
             ConfigOptions.key("db-type").stringType().noDefaultValue().withDescription("");
 
